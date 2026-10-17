@@ -143,6 +143,7 @@ dialog h2 { font-size: 18px; }
 /* photo scan */
 .scan-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin: 0 0 12px; }
 .scan-btn input { display: none; }
+.scan-row .btn { cursor: pointer; }
 .scan-dialog { width: min(94vw, 480px); max-height: 92vh; overflow-y: auto; }
 .scan-thumb { width: 100%; max-height: 200px; object-fit: contain; background: #000; border-radius: 8px; }
 .cands { display: grid; gap: 6px; }

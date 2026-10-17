@@ -248,7 +248,7 @@
       <nav class="tabs" role="tablist">
         ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
-      ${tab !== "upgrades" ? `<div class="scan-row"><label class="btn ghost scan-btn">📷 Add gear from photos<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Snap the item tooltip — straight on, whole box in frame.</span></div>` : ""}
+      ${tab !== "upgrades" ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
       <section id="tabBody"></section>`;
 
     $("#fName").oninput = (e) => { c.name = e.target.value; save(); renderRoster(); };
@@ -263,8 +263,10 @@
     $("#fBudget").onchange = (e) => { c.budget = Number(e.target.value); save(); render(); };
     $("#fMode").onchange = (e) => { c.mode = e.target.value; save(); };
     app.querySelectorAll(".tab").forEach((t) => (t.onclick = () => { tab = t.dataset.tab; render(); }));
-    const si = $("#scanInput");
-    if (si) si.onchange = (e) => { const files = [...e.target.files]; e.target.value = ""; scanPhotos(c, files); };
+    ["#scanInput", "#scanCam"].forEach((sel) => {
+      const si = $(sel);
+      if (si) si.onchange = (e) => { const files = [...e.target.files]; e.target.value = ""; scanPhotos(c, files); };
+    });
 
     const body = $("#tabBody");
     if (tab === "gear") renderSlots(body, c, GEAR_SLOTS);
@@ -479,7 +481,8 @@
       : `<ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`}
       <div class="tip-actions">
         <button class="link edit-note" type="button">✎ ${mine.length ? "Edit your rolls" : "Add your rolls"}</button>
-        <label class="link">📷 ${entry.photo ? "Change photo" : "Add photo"}<input type="file" class="ph-in" accept="image/*" hidden></label>
+        <label class="link">📷 ${entry.photo ? "Retake photo" : "Take photo"}<input type="file" class="ph-in" accept="image/*" capture="environment" hidden></label>
+        <label class="link">🖼 Gallery<input type="file" class="ph-in" accept="image/*" hidden></label>
         ${entry.photo ? `<button class="link rm-ph" type="button">Remove photo</button>` : ""}
       </div>
       <textarea class="note" rows="4" hidden placeholder="One stat per line, e.g. +35% Faster Cast Rate">${esc(mine.join("\n"))}</textarea>
@@ -501,13 +504,12 @@
       }
       const ph = $(".ph", tip);
       if (ph) ph.onclick = () => viewPhoto(get()?.photo, $(".tip-name", tip)?.textContent);
-      const inp = $(".ph-in", tip);
-      if (inp) inp.onchange = async () => {
+      tip.querySelectorAll(".ph-in").forEach((inp) => inp.onchange = async () => {
         const f = inp.files[0]; if (!f) return;
         const en = get(); if (!en) return;
         try { const id = await storePhoto(f); dropPhoto(en.photo); en.photo = id; save(); render(); }
         catch (err) { alert("Couldn't save that photo on this device (storage may be full or blocked)."); }
-      };
+      });
       const rm = $(".rm-ph", tip);
       if (rm) rm.onclick = () => { const en = get(); if (!en) return; dropPhoto(en.photo); delete en.photo; save(); render(); };
     });
