@@ -1,47 +1,107 @@
 // Turns noisy OCR text from a photo of a D2R tooltip into clean stat lines.
-// Keeps only lines that read as real item properties; fixes common OCR slips
-// (° for %, 2 for %, split or misspelled words, stray symbols at the edges).
+// Each line is matched against known D2R property wordings and rebuilt in a
+// standard form, so junk before or after a stat (neighbouring panels, icons,
+// mixed-caps misreads) never makes it into the result.
 (function (root) {
-  // [phrase, isPercent, plausibleMax]
-  const STATS = [
-    ["to all skills", 0, 5], ["skill levels", 0, 5], ["skills", 0, 6], ["only)", 0, 20],
-    ["faster cast rate", 1, 75], ["faster hit recovery", 1, 60], ["faster run/walk", 1, 45], ["faster run walk", 1, 45],
-    ["increased attack speed", 1, 70], ["faster block rate", 1, 60], ["increased chance of blocking", 1, 50],
-    ["enhanced damage", 1, 500], ["enhanced defense", 1, 400], ["enhanced maximum damage", 1, 400],
-    ["better chance of getting magic items", 1, 100], ["extra gold from monsters", 1, 300], ["experience gained", 1, 15],
-    ["life stolen per hit", 1, 15], ["mana stolen per hit", 1, 15], ["deadly strike", 1, 100], ["crushing blow", 1, 60], ["open wounds", 1, 100],
-    ["damage reduced by", 0, 60], ["magic damage reduced by", 0, 20], ["physical damage received reduced", 1, 20],
-    ["fire resist", 1, 75], ["cold resist", 1, 75], ["lightning resist", 1, 75], ["poison resist", 1, 75], ["all resistances", 0, 75],
-    ["maximum fire resist", 1, 10], ["maximum cold resist", 1, 10], ["maximum lightning resist", 1, 10], ["maximum poison resist", 1, 10],
-    ["absorb", 0, 40], ["to enemy", 1, 60], ["resistance", 1, 75],
-    ["to life", 0, 400], ["to mana", 0, 400], ["to strength", 0, 60], ["to dexterity", 0, 60], ["to vitality", 0, 60], ["to energy", 0, 60],
-    ["to all attributes", 0, 30], ["to attack rating", 0, 1500], ["attack rating", 0, 1500], ["to maximum damage", 0, 500], ["to minimum damage", 0, 200],
-    ["defense vs. missile", 0, 400], ["defense vs missile", 0, 400], ["defense", 0, 1000],
-    ["adds", 0, 999], ["fire damage", 0, 999], ["cold damage", 0, 999], ["lightning damage", 0, 999], ["poison damage", 0, 999], ["magic damage", 0, 999], ["damage", 0, 999],
-    ["regenerate mana", 1, 100], ["replenish life", 0, 50], ["life after each kill", 0, 20], ["mana after each kill", 0, 20],
-    ["increase maximum life", 1, 20], ["increase maximum mana", 1, 50], ["maximum mana", 1, 50], ["maximum life", 1, 20],
-    ["chance to cast", 0, 99], ["aura when equipped", 0, 30], ["ignore target", 0, 1], ["piercing attack", 1, 100], ["knockback", 0, 1],
-    ["slows target", 1, 50], ["prevent monster heal", 0, 1], ["cannot be frozen", 0, 1], ["half freeze duration", 0, 1], ["light radius", 0, 10],
-    ["attacker takes damage", 0, 300], ["damage to demons", 1, 400], ["damage to undead", 1, 400], ["requirements", 1, 100],
-    ["socketed", 0, 6], ["ethereal", 0, 1], ["indestructible", 0, 1], ["repairs", 0, 10], ["charges", 0, 999], ["damage taken goes to mana", 1, 20],
-    ["hit causes monster to flee", 1, 50], ["hit blinds target", 0, 5], ["freezes target", 0, 5], ["reduces all vendor prices", 1, 15],
-    ["based on character level", 0, 999], ["when struck", 1, 100], ["on striking", 1, 100], ["on attack", 1, 100], ["teleport", 0, 1],
-  ];
-  // Lines that are base-item info, not properties.
-  const NOT_STATS = /^(defense|durability|required|chance to block|quantity|one-hand damage|two-hand damage|throw damage|one hand damage|two hand damage|item version|sell value|shift|keep in inventory|right click|left click|ctrl|press)\b/i;
+  const T = (s) => s.replace(/\b([a-z])/g, (m) => m.toUpperCase()).replace(/\b(To|Of|On|By|The|Vs|In|After|Per|From)\b/g, (m) => m.toLowerCase());
+  const SK = (s) => s.trim().split(/\s+/).map((w) => w[0].toUpperCase() + w.slice(1)).join(" "); // skill / aura names
+  const sign = (n) => (/^[+\-]/.test(n) ? n : "+" + n);
+  const neg = (n) => (/^[+\-]/.test(n) ? n : "-" + n);
+  const N = "([+\\-]?\\d{1,4})";          // a signed number
+  const GAP = "\\s*(?:\\S{1,3}\\s+)?";     // tolerate one short garbled word ("Te" for "to")
+  const ELEM = "(fire|cold|lightning|poison|magic)";
 
-  const OCR_FIX = { al: "all", ys: "vs", fo: "to", t0: "to", ot: "of", tlie: "the", tbe: "the", wlth: "with", lite: "life", iife: "life", rn: "m" };
-  let DICT = null;
-  function dict(extraText) {
-    if (DICT) return DICT;
-    const words = new Set();
-    const add = (s) => String(s).toLowerCase().split(/[^a-z']+/).forEach((w) => w.length > 1 && words.add(w));
-    STATS.forEach(([p]) => add(p));
-    add("to of the on by in and per vs based level character only amazon assassin barbarian druid necromancer paladin sorceress warlock all skills fire cold lightning poison magic physical damage resist life mana strength dexterity vitality energy attributes faster cast rate hit recovery run walk attack speed block blocking enhanced defense better chance getting items extra gold monsters experience gained stolen deadly strike crushing blow open wounds reduced maximum minimum regenerate replenish after each kill increase aura equipped ignore target's piercing knockback slows prevent monster heal cannot frozen freeze duration light radius attacker takes demons undead requirements socketed ethereal indestructible repairs durability charges teleport when struck striking enemy resistance resistances missile adds javelin spear bow crossbow traps repaired cast casts level levels shadow disciplines martial arts combat warcries masteries shape shifting elemental summoning curses poison bone offensive defensive auras chaos demon eldritch skill");
-    if (extraText) add(extraText);
-    DICT = words;
-    return words;
+  // Percent stats written "+X% Name". [regex body, display name, plausible max]
+  const PCT_BEFORE = [
+    ["faster cast rate", "Faster Cast Rate", 75], ["faster hit recovery", "Faster Hit Recovery", 60],
+    ["faster run\\s*/?\\s*walk", "Faster Run/Walk", 45], ["increased attack speed", "Increased Attack Speed", 70],
+    ["faster block rate", "Faster Block Rate", 60], ["increased chance of blocking", "Increased Chance of Blocking", 50],
+    ["enhanced maximum damage", "Enhanced Maximum Damage", 400], ["enhanced damage", "Enhanced Damage", 500],
+    ["enhanced defense", "Enhanced Defense", 400], ["better chance of getting magic items", "Better Chance of Getting Magic Items", 100],
+    ["extra gold from monsters", "Extra Gold from Monsters", 300], ["to experience gained", "to Experience Gained", 15],
+    ["life stolen per hit", "Life Stolen per Hit", 15], ["mana stolen per hit", "Mana Stolen per Hit", 15],
+    ["deadly strike", "Deadly Strike", 100], ["chance of crushing blow", "Chance of Crushing Blow", 60],
+    ["chance of open wounds", "Chance of Open Wounds", 100], ["damage taken goes to mana", "Damage Taken Goes to Mana", 20],
+    ["damage to demons", "Damage to Demons", 400], ["damage to undead", "Damage to Undead", 400],
+    ["chance of uninterruptable attack", "Chance of Uninterruptable Attack", 100],
+  ];
+
+  const RULES = [
+    // skills
+    [new RegExp(N + GAP + "to all skills"), (m) => `${sign(m[1])} to All Skills`],
+    [new RegExp(N + GAP + "to (\\w+) skill levels"), (m) => `${sign(m[1])} to ${SK(m[2])} Skill Levels`],
+    [new RegExp(N + GAP + "to ([a-z' ]+?) skills\\s*\\(?\\s*(\\w+) only"), (m) => `${sign(m[1])} to ${SK(m[2])} Skills (${SK(m[3])} Only)`],
+    [new RegExp(N + GAP + "to ([a-z' ]+?)\\s*\\(\\s*(\\w+) only"), (m) => `${sign(m[1])} to ${SK(m[2])} (${SK(m[3])} Only)`],
+    [new RegExp("(\\d{1,2})\\s*%?\\s*chance to cast level (\\d{1,2}) ([a-z' ]+?) (when struck|on striking|on attack|when you kill an enemy|when you die|when you level.?up)"),
+      (m) => `${m[1]}% Chance to Cast Level ${m[2]} ${SK(m[3])} ${T(m[4])}`],
+    [/level (\d{1,2}) ([a-z' ]+?) aura when equipped/, (m) => `Level ${m[1]} ${SK(m[2])} Aura When Equipped`],
+    [/level (\d{1,2}) ([a-z' ]+?)\s*\(\s*(\d{1,3})\s*\/\s*(\d{1,3}) charges/, (m) => `Level ${m[1]} ${SK(m[2])} (${m[3]}/${m[4]} Charges)`],
+    // elements
+    [new RegExp(N + "\\s*%?\\s*to enemy " + ELEM + " resistance"), (m) => `${neg(m[1])}% to Enemy ${SK(m[2])} Resistance`],
+    [new RegExp(N + "\\s*%?\\s*to " + ELEM + " skill damage"), (m) => `${sign(m[1])}% to ${SK(m[2])} Skill Damage`],
+    [new RegExp("adds (\\d{1,4})\\s*-\\s*(\\d{1,4}) " + ELEM + " damage"), (m) => `Adds ${m[1]}-${m[2]} ${SK(m[3])} Damage`],
+    [new RegExp("maximum " + ELEM + " resist\\s*" + N), (m) => `Maximum ${SK(m[1])} Resist ${sign(m[2])}%`],
+    [new RegExp(ELEM + " resist\\s*" + N), (m) => `${SK(m[1])} Resist ${sign(m[2])}%`],
+    [/all resistances\s*([+\-]?\d{1,3})/, (m) => `All Resistances ${sign(m[1])}`],
+    [new RegExp(ELEM + " absorb\\s*(\\d{1,3})\\s*%"), (m) => `${SK(m[1])} Absorb ${m[2]}%`],
+    [new RegExp(N + GAP + ELEM + " absorb"), (m) => `${sign(m[1])} ${SK(m[2])} Absorb`],
+    // defensive / utility
+    [/magic damage reduced by (\d{1,3})/, (m) => `Magic Damage Reduced by ${m[1]}`],
+    [/(?:^|[^c] )damage reduced by (\d{1,3})(\s*%)?/, (m) => `Damage Reduced by ${m[1]}${m[2] ? "%" : ""}`],
+    [/physical damage (?:taken|received) reduced by (\d{1,3})/, (m) => `Physical Damage Taken Reduced by ${m[1]}%`],
+    [/regenerate mana (\d{1,3})/, (m) => `Regenerate Mana ${m[1]}%`],
+    [/increase maximum (life|mana) (\d{1,3})/, (m) => `Increase Maximum ${SK(m[1])} ${m[2]}%`],
+    [/replenish life\s*\+?\s*(\d{1,3})/, (m) => `Replenish Life +${m[1]}`],
+    [/attacker takes damage of (\d{1,4})/, (m) => `Attacker Takes Damage of ${m[1]}`],
+    [/socketed\s*\(?\s*(\d)/, (m) => `Socketed (${m[1]})`],
+    [/requirements\s*[+\-]?\s*(\d{1,3})/, (m) => `Requirements -${m[1]}%`],
+    [/slows target by (\d{1,2})/, (m) => `Slows Target by ${m[1]}%`],
+    [/hit causes monster to flee (\d{1,3})/, (m) => `Hit Causes Monster to Flee ${m[1]}%`],
+    [/reduces all vendor prices (\d{1,2})/, (m) => `Reduces All Vendor Prices ${m[1]}%`],
+    [/repairs (\d) durability in (\d{1,3}) seconds/, (m) => `Repairs ${m[1]} Durability in ${m[2]} Seconds`],
+    // flat "+X to Something"
+    [new RegExp(N + GAP + "(?:to\\s+)?life\\s*\\(?\\s*based on character level"), (m) => `${sign(m[1])} to Life (Based on Character Level)`],
+    [new RegExp(N + GAP + "(?:to\\s+)?mana\\s*\\(?\\s*based on character level"), (m) => `${sign(m[1])} to Mana (Based on Character Level)`],
+    [new RegExp(N + GAP + "(?:to\\s+)?(strength|dexterity|vitality|energy)\\s*\\(?\\s*based on character level"), (m) => `${sign(m[1])} to ${SK(m[2])} (Based on Character Level)`],
+    [new RegExp(N + GAP + "life after each kill"), (m) => `${sign(m[1])} Life after each Kill`],
+    [new RegExp(N + GAP + "(?:to\\s+)?mana after each kill"), (m) => `${sign(m[1])} to Mana after each Kill`],
+    [new RegExp(N + GAP + "to all attributes"), (m) => `${sign(m[1])} to All Attributes`],
+    [new RegExp(N + GAP + "to (strength|dexterity|vitality|energy)\\b"), (m) => `${sign(m[1])} to ${SK(m[2])}`],
+    [new RegExp(N + GAP + "to attack rating against (demons|undead)"), (m) => `${sign(m[1])} to Attack Rating against ${SK(m[2])}`],
+    [new RegExp(N + GAP + "to attack rating"), (m) => `${sign(m[1])} to Attack Rating`],
+    [new RegExp(N + GAP + "to (maximum|minimum) damage"), (m) => `${sign(m[1])} to ${SK(m[2])} Damage`],
+    [new RegExp(N + GAP + "to light radius"), (m) => `${sign(m[1])} to Light Radius`],
+    [new RegExp(N + GAP + "defense vs\\.?\\s*(missile|melee)"), (m) => `${sign(m[1])} Defense vs. ${SK(m[2])}`],
+    [new RegExp("([+\\-]\\d{1,4})\\s+defense\\b(?!\\s*vs)"), (m) => `${m[1]} Defense`],
+    [new RegExp(N + GAP + "to life\\b"), (m) => `${sign(m[1])} to Life`],
+    [new RegExp(N + GAP + "to mana\\b"), (m) => `${sign(m[1])} to Mana`],
+    // flags (no number)
+    [/cannot be frozen/, () => "Cannot Be Frozen"], [/half freeze duration/, () => "Half Freeze Duration"],
+    [/prevent monster heal/, () => "Prevent Monster Heal"], [/\bknockback\b/, () => "Knockback"],
+    [/ignore target'?s? defense/, () => "Ignore Target's Defense"], [/\bindestructible\b/, () => "Indestructible"],
+    [/\bethereal\b/, () => "Ethereal (Cannot be Repaired)"], [/hit blinds target/, () => "Hit Blinds Target"],
+  ];
+  for (const [re, name, max] of PCT_BEFORE) {
+    RULES.push([new RegExp(N + "\\s*(%?)\\s*" + re), (m) => {
+      let n = m[1];
+      // OCR often reads "%" as "2" or "9": "+102 Faster Cast Rate" → +10%
+      if (!m[2] && Number(n.replace(/^[+\-]/, "")) > max && /[2-9]$/.test(n) && Number(n.replace(/^[+\-]/, "").slice(0, -1)) <= max) n = n.slice(0, -1);
+      return `${/stolen|deadly|chance of|goes to mana|gold|magic items/.test(re) ? n.replace(/^\+/, "") : sign(n)}% ${name}`;
+    }]);
   }
+
+  // Generic vocabulary used only to repair split or misspelled words.
+  const CORE = ("to of the on by in and per vs based level character only all skills skill levels fire cold lightning poison magic physical " +
+    "damage resist resistance resistances life mana strength dexterity vitality energy attributes faster cast rate hit recovery run walk " +
+    "increased attack speed block blocking enhanced defense better chance getting items extra gold monsters experience gained stolen " +
+    "deadly strike crushing blow open wounds reduced maximum minimum regenerate replenish after each kill increase aura when equipped " +
+    "ignore target's piercing knockback slows prevent monster heal cannot frozen freeze duration light radius attacker takes demons " +
+    "undead requirements socketed ethereal indestructible repairs repaired durability charges struck striking enemy missile melee adds " +
+    "absorb taken received goes vendor prices reduces flee blinds amazon assassin barbarian druid necromancer paladin sorceress warlock " +
+    "javelin spear bow crossbow traps shadow disciplines martial arts combat warcries masteries shape shifting elemental summoning curses " +
+    "bone offensive defensive auras chaos demon eldritch seconds against uninterruptable").split(" ");
+  const D = new Set(CORE);
+  const OCR_FIX = { al: "all", ys: "vs", fo: "to", te: "to", t0: "to", ot: "of", lite: "life", iife: "life" };
 
   function lev(a, b) {
     const m = a.length, n = b.length;
@@ -54,89 +114,58 @@
     }
     return prev[n];
   }
-  function closest(w, D) {
+  function closest(w) {
+    if (w.length < 5) return null;
     let best = null, bd = 99;
-    for (const d of D) {
-      if (Math.abs(d.length - w.length) > 2) continue;
-      const x = lev(w, d);
-      if (x < bd) { bd = x; best = d; }
-    }
-    const ok = best && (w.length >= 6 ? bd <= 2 : w.length >= 4 ? bd <= 1 : false);
-    return ok ? best : null;
+    for (const d of D) { if (Math.abs(d.length - w.length) > 2) continue; const x = lev(w, d); if (x < bd) { bd = x; best = d; } }
+    return bd <= (w.length >= 7 ? 2 : 1) ? best : null;
   }
-  const matchCase = (orig, w) => (orig[0] === orig[0].toUpperCase() ? w[0].toUpperCase() + w.slice(1) : w);
-
-  // Fix words: merge "Reduc ed" → "Reduced", correct "Vitahty" → "Vitality", "I ightning" → "Lightning".
-  function fixWords(line, D) {
-    const toks = line.split(/\s+/).filter(Boolean);
+  // Lower-case, fix symbols, merge "reduc ed", repair "vitahty". Skill names it doesn't know are left alone.
+  function normalize(raw) {
+    let s = raw.toLowerCase()
+      .replace(/^\s*\*(?=\d)/, "+").replace(/[“”«»‘’`´]/g, "'")
+      .replace(/(\d)\s*[°º]o?/g, "$1%").replace(/(\d)\s*%o\b/g, "$1%")
+      .replace(/(^|\s)[il|]\s?(?=\d)/g, "$11") // "I 1%" → "11%"
+      .replace(/[—–]/g, "-").replace(/([+\-])\s+(\d)/g, "$1$2").replace(/(\d)\s+%/g, "$1%")
+      .replace(/[|\[\]{}=_~;]/g, " ").replace(/\s+/g, " ").trim();
+    const toks = s.split(" ");
     const out = [];
     for (let i = 0; i < toks.length; i++) {
       const t = toks[i];
-      const core = t.replace(/^[^A-Za-z]+|[^A-Za-z']+$/g, "");
-      const pre = t.slice(0, t.indexOf(core));
-      const post = t.slice(t.indexOf(core) + core.length).replace(/[^%),.:']/g, ""); // drop stray "]" "|" etc.
-      const lw = core.toLowerCase();
-      if (!core || /\d/.test(core) || D.has(lw)) { out.push(t); continue; }
-      const next = toks[i + 1] && toks[i + 1].replace(/[^A-Za-z']+$/g, "");
-      if (next && /^[A-Za-z']+$/.test(next)) {
-        const merged = (lw + next.toLowerCase());
-        const hit = D.has(merged) ? merged : (!D.has(next.toLowerCase()) && closest(merged, D));
-        if (hit) { out.push(pre + matchCase(core, hit) + toks[i + 1].slice(next.length)); i++; continue; }
-      }
-      const fixed = OCR_FIX[lw] || closest(lw, D);
-      out.push(fixed ? pre + matchCase(core, fixed) + post : t);
+      const m = t.match(/^([^a-z']*)([a-z']+)([^a-z']*)$/);
+      if (!m || D.has(m[2])) { out.push(t); continue; }
+      const nx = toks[i + 1] && toks[i + 1].match(/^([a-z']+)([^a-z']*)$/);
+      if (nx && !m[3] && D.has(m[2] + nx[1])) { out.push(m[1] + m[2] + nx[1] + nx[2]); i++; continue; }
+      const fix = OCR_FIX[m[2]] || closest(m[2]);
+      out.push(fix ? m[1] + fix + m[3] : t);
     }
     return out.join(" ");
   }
 
-  function cleanLine(raw, D) {
-    let s = raw
-      .replace(/^\s*\*(?=\d)/, "+")
-      .replace(/[“”«»]/g, "'").replace(/[‘’`´]/g, "'")
-      .replace(/(\d)\s*[°º]o?/g, "$1%").replace(/(\d)\s*%o\b/g, "$1%")
-      .replace(/(\d%)(?=[A-Za-z])/g, "$1 ")
-      .replace(/[—–]/g, "-")
-      .replace(/^[^A-Za-z0-9+\-(']+/, "").replace(/[^A-Za-z0-9%)']+$/, "")
-      .replace(/\s+/g, " ").trim();
-    // Drop 1-2 char junk tokens at the edges ("S +250 Defense", "Mana =")
-    s = s.replace(/^(?:[A-Za-z]{1,2}|[|=:;_~]+)\s+(?=[+\-\d])/, "").replace(/\s+(?:[|=:;_~]+|[A-Za-z])$/, "");
-    s = s.replace(/([+\-])\s+(\d)/g, "$1$2").replace(/(\d)\s+%/g, "$1%");
-    if (s.length < 4) return null;
-    s = fixWords(s, D);
-    const low = s.toLowerCase();
-    if (NOT_STATS.test(low)) return null;
-    const stat = STATS.find(([p]) => low.includes(p));
-    if (!stat) return null;
-    const [phrase, pct, max] = stat;
-    // Mostly real words? (keeps garbage like "Crs af Chek to Close" out)
-    const words = low.split(/[^a-z']+/).filter((w) => w.length > 1);
-    const known = words.filter((w) => D.has(w)).length;
-    if (words.length && known / words.length < 0.6) return null;
-    if (pct) {
-      // "+102 Faster Cast Rate" → OCR read "%" as "2"; "+35," → missing %.
-      s = s.replace(/([+\-]?)(\d+)([,.:;']?)(?!\d)(?!%)/, (m, sign, num, punct) => {
-        let n = Number(num);
-        if (n > max && /[2296]$/.test(num) && Number(num.slice(0, -1)) <= max) num = num.slice(0, -1);
-        return `${sign}${num}%`;
-      });
+  function parseLine(raw) {
+    const s = normalize(raw);
+    const found = [];
+    for (const [re, fmt] of RULES) {
+      const m = s.match(re);
+      if (m) found.push({ at: m.index, len: m[0].length, text: fmt(m) });
     }
-    // Lines that need a number but have none are probably fragments.
-    const noNumberOk = /(cannot be frozen|half freeze|prevent monster heal|knockback|ethereal|indestructible|ignore target|teleport|only\))/;
-    if (!/\d/.test(s) && !noNumberOk.test(low)) return null;
-    return s.replace(/\s+([,.:;])/g, "$1").trim();
+    // Keep non-overlapping matches, longest first (e.g. "Magic Damage Reduced" over "Damage Reduced").
+    found.sort((a, b) => b.len - a.len);
+    const kept = [];
+    for (const f of found) if (!kept.some((k) => f.at < k.at + k.len && k.at < f.at + f.len)) kept.push(f);
+    return kept.sort((a, b) => a.at - b.at).map((k) => k.text);
   }
 
-  // text: raw OCR text. skipNames: normalized item names/aliases to leave out.
-  function cleanStats(text, extraVocab) {
-    const D = dict(extraVocab);
-    const seen = new Set();
-    const out = [];
+  function cleanStats(text) {
+    const seen = new Set(), out = [];
     for (const raw of String(text || "").split(/\n+/)) {
-      const c = cleanLine(raw, D);
-      if (c && !seen.has(c.toLowerCase())) { seen.add(c.toLowerCase()); out.push(c); }
+      for (const line of parseLine(raw)) {
+        const key = line.replace(/[+\-]?\d+/g, "#").toLowerCase();
+        if (!seen.has(key)) { seen.add(key); out.push(line); }
+      }
     }
     return out;
   }
 
-  root.StatClean = { cleanStats, cleanLine: (l, x) => cleanLine(l, dict(x)) };
+  root.StatClean = { cleanStats, parseLine };
 })(typeof window !== "undefined" ? window : globalThis);
