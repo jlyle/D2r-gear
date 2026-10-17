@@ -85,6 +85,8 @@
   for (const [re, name, max] of PCT_BEFORE) {
     RULES.push([new RegExp(N + "\\s*(%?)\\s*" + re), (m) => {
       let n = m[1];
+      // These always roll in 5s/10s: a lone "2" or "3" is a 20/30 that lost its zero.
+      if (/faster cast|faster hit|faster run|attack speed|faster block/.test(re) && /^[+\-]?[1-9]$/.test(n) && Number(n.replace(/^[+\-]/, "")) * 10 <= max) n = n + "0";
       // OCR often reads "%" as "2" or "9": "+102 Faster Cast Rate" → +10%
       if (!m[2] && Number(n.replace(/^[+\-]/, "")) > max && /[2-9]$/.test(n) && Number(n.replace(/^[+\-]/, "").slice(0, -1)) <= max) n = n.slice(0, -1);
       return `${/stolen|deadly|chance of|goes to mana|gold|magic items/.test(re) ? n.replace(/^\+/, "") : sign(n)}% ${name}`;
@@ -144,9 +146,17 @@
     for (const d of D) { if (Math.abs(d.length - w.length) > 2) continue; const x = wlev(w, d); if (x < bd) { bd = x; best = d; } }
     return bd <= (w.length >= 7 ? 2 : w.length >= 5 ? 1.4 : 0.8) ? best : null;
   }
+  // D2R draws zero with a slash (Ø). OCR turns it into Ø ø @ © ® θ, or a degree sign before "%".
+  function fixZeros(s) {
+    return s
+      .replace(/(\d)\s*[Øø@©®θΘϕΦ]/g, "$10").replace(/[Øø@©®θΘϕΦ](?=\d)/g, "0")
+      .replace(/(\d)[°º](?=\s*%)/g, "$10")          // "3°%" → "30%"
+      .replace(/(\d)[oO](?=\s*%|\s+to\b|\s+(?:faster|enhanced|increased|deadly|chance|better|extra|life|mana|damage)\b|$)/g, "$10")
+      .replace(/(\d)\/(?=\s*%)/g, "$10");          // "2/%" → "20%"
+  }
   // Lower-case, fix symbols, merge "reduc ed", repair "vitahty". Skill names it doesn't know are left alone.
   function normalize(raw) {
-    let s = raw.toLowerCase()
+    let s = fixZeros(raw).toLowerCase()
       .replace(/^\s*\*(?=\d)/, "+").replace(/[“”«»‘’`´]/g, "'")
       .replace(/(\d)\s*[°º]o?/g, "$1%").replace(/(\d)\s*%o\b/g, "$1%")
       .replace(/(^|\s)[il|]\s?(?=\d)/g, "$11") // "I 1%" → "11%"
@@ -199,7 +209,7 @@
   const letters = (s) => s.toLowerCase().replace(/[^a-z]/g, "");
   const NUM_RE = /(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?/g;
   function photoNumbers(line) {
-    const fixed = line.replace(/(?<=\d)[oO](?=\d|\b)/g, "0").replace(/(?<=\d)[lI|](?=\d)/g, "1").replace(/\b[lI|](?=\d)/g, "1");
+    const fixed = fixZeros(line).replace(/(?<=\d)[oO](?=\d|\b)/g, "0").replace(/(?<=\d)[lI|](?=\d)/g, "1").replace(/\b[lI|](?=\d)/g, "1");
     return [...fixed.matchAll(/\d+/g)].map((m) => Number(m[0]));
   }
   function fillTemplate(tpl, nums) {
@@ -216,9 +226,11 @@
     return tpl.replace(NUM_RE, (m, a, b) => {
       const lo = Number(a), hi = b != null ? Number(b) : lo;
       // take the next photo number that fits this stat's range (a little slack for rounding)
+      const fits = (n) => n >= Math.floor(lo * 0.95) && n <= Math.ceil(hi * 1.05);
       for (let i = k; i < nums.length; i++) {
         const n = nums[i];
-        if (n >= Math.floor(lo * 0.95) && n <= Math.ceil(hi * 1.05)) { k = i + 1; return String(n); }
+        if (fits(n)) { k = i + 1; return String(n); }
+        if (fits(n * 10)) { k = i + 1; return String(n * 10); } // trailing zero dropped by OCR ("2" for 20)
       }
       if (b == null) return a;      // fixed value: trust the game data
       return m;                      // variable and unreadable: leave the range so it's obvious to edit
@@ -249,7 +261,7 @@
     // Sanity check: a correctly identified item shows most of its known stat lines.
     // If the photo matches too few of them, the item is probably wrong — read the photo generically.
     const matchedTpls = new Set(pairs.filter((p) => p.s >= 0.7).map((p) => p.ti));
-    if (tpls.length && matchedTpls.size < Math.max(1, Math.ceil(tpls.length * 0.5))) return cleanStats(text);
+    if (tpls.length && matchedTpls.size < Math.min(tpls.length, Math.max(2, Math.ceil(tpls.length * 0.34)))) return cleanStats(text);
     const used = new Set(), taken = new Set(), out = [];
     for (const p of pairs) {
       if (used.has(p.ti) || taken.has(p.li)) continue;
