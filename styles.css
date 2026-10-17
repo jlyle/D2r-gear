@@ -214,3 +214,5 @@ dialog h2 { font-size: 18px; }
 .pv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .tip-divider { border: 0; border-top: 2px solid var(--accent); margin: 12px 0 4px; opacity: .8; }
 .tip-stats.mine li { color: #c9d0ff; }
+.item-ico { flex: none; width: 52px; height: 52px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.06), transparent 70%), #070606; }
+.item-ico svg { width: 36px; height: 36px; }
