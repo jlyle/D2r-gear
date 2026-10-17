@@ -476,11 +476,12 @@
           ${it.runes ? `<div class="tip-runes">'${esc(it.runes.replace(/ /g, ""))}'</div>` : ""}
         </div>
       </div>
-      ${mine.length ? `<div class="tip-h">Your item</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
-        <details class="typ"><summary>Typical stats</summary><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></details>`
-      : `<ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`}
+      ${mine.length
+        // Actual stats from the photo (or typed in) replace the database's typical stats.
+        ? `<div class="tip-h">Actual stats</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`
+        : `<div class="tip-h">Typical stats</div><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`}
       <div class="tip-actions">
-        <button class="link edit-note" type="button">✎ ${mine.length ? "Edit your rolls" : "Add your rolls"}</button>
+        <button class="link edit-note" type="button">✎ ${mine.length ? "Edit stats" : "Enter actual stats"}</button>
         <label class="link">📷 ${entry.photo ? "Retake photo" : "Take photo"}<input type="file" class="ph-in" accept="image/*" capture="environment" hidden></label>
         <label class="link">🖼 Gallery<input type="file" class="ph-in" accept="image/*" hidden></label>
         ${entry.photo ? `<button class="link rm-ph" type="button">Remove photo</button>` : ""}
@@ -950,7 +951,7 @@
         <label class="field"><span>Put it in</span><select id="scanDest"></select></label>
         <label class="check" id="moveWrap"><input type="checkbox" id="scanMove" checked> Move the replaced item to the shared stash</label>
         <label class="check"><input type="checkbox" id="scanKeep" checked> Keep this photo with the item</label>
-        <label class="field"><span>Your rolls (read from the photo — one per line, edit as needed)</span><textarea id="scanNote" rows="6"></textarea></label>
+        <label class="field"><span>Actual stats (read from the photo — one per line, edit as needed)</span><textarea id="scanNote" rows="6"></textarea></label>
         <details class="raw"><summary>Text read from photo</summary><pre>${esc(text.trim()) || "(nothing)"}</pre></details>
         <div class="row-btns end">
           <button class="btn ghost" value="skip" formnovalidate>Skip</button>
