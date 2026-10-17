@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gear Ledger</title>
+  <meta name="description" content="Track Diablo II: Resurrected character gear, charms and mercenary, and get upgrade recommendations by build and budget.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Gear Ledger</h1>
+      <span class="sub">D2R inventory &amp; upgrades</span>
+    </div>
+    <div class="roster">
+      <select id="charSelect" aria-label="Character"></select>
+      <button id="newChar" class="btn">+ New</button>
+      <details class="menu">
+        <summary class="btn ghost" aria-label="More">⋯</summary>
+        <div class="menu-pop">
+          <button id="exportBtn">Export backup</button>
+          <label class="file-label">Import backup<input id="importFile" type="file" accept="application/json"></label>
+          <button id="deleteChar" class="danger">Delete character</button>
+        </div>
+      </details>
+    </div>
+  </header>
+
+  <main id="app"></main>
+
+  <footer class="foot">
+    Saved in this browser. Use <b>Export backup</b> to move characters between devices.
+    Fan-made tool, not affiliated with Blizzard Entertainment.
+  </footer>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
