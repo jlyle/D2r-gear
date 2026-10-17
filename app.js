@@ -10,7 +10,17 @@
 
   // ---------- state ----------
   let state = load();
+  if (!Array.isArray(state.stash)) state.stash = []; // shared stash, across all characters
   let tab = "gear";
+
+  const SLOT_LABELS = { helm: "Helms", amulet: "Amulets", ring: "Rings", weapon: "Weapons", offhand: "Shields & off-hands", armor: "Armor", gloves: "Gloves", belt: "Belts", boots: "Boots", charm: "Charms" };
+  const inStash = (name) => state.stash.some((s) => s.item === name);
+  // Traderie search link; generic rare/crafted entries have no single listing.
+  function traderieLink(it) {
+    if (!it || it.type === "rare" || (it.type === "charm" && !it.unique1)) return "";
+    const q = it.name.replace(/ \((sword|shield|helm)\)$/, "");
+    return `<a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(q)}" target="_blank" rel="noopener">Traderie ↗</a>`;
+  }
 
   function load() {
     try {
@@ -67,6 +77,9 @@
     }
     // if level gates everything, still show the target tier as goals
     if (!items.length) for (const n of tiers[target]) { const it = byName.get(n); if (it && n !== curName) items.push({ item: it, tier: target, gated: true }); }
+    // Items already in the shared stash come first.
+    items.forEach((x) => (x.stash = inStash(x.item.name) && !x.gated));
+    items.sort((a, z) => (z.stash ? 1 : 0) - (a.stash ? 1 : 0));
     return { status: t === -2 ? "empty" : t === -1 ? "off" : "below", tier: t, gap: target - t, items };
   }
   const fitsLevel = (it, c) => !c.level || !it.req || it.req <= Number(c.level);
@@ -106,7 +119,7 @@
         <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option ${m === c.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
-        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
+        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
       <section id="tabBody"></section>`;
 
@@ -127,6 +140,7 @@
     if (tab === "gear") renderSlots(body, c, GEAR_SLOTS);
     else if (tab === "merc") renderSlots(body, c, MERC_SLOTS);
     else if (tab === "charms") renderCharms(body, c);
+    else if (tab === "stash") renderStash(body, c);
     else renderUpgrades(body, c);
   }
 
@@ -240,6 +254,105 @@
     });
   }
 
+  // Slots on this character (and merc) a given item could go into.
+  function slotsFor(c, it) {
+    return [...GEAR_SLOTS, ...MERC_SLOTS].filter((s) => {
+      const isMerc = s.key.startsWith("merc");
+      const listOk = it.slot === s.list || (s.key === "offhand" && c.cls === "Barbarian" && it.slot === "weapon");
+      if (!listOk) return false;
+      if (isMerc) return !it.cls && (!s.mercOnly || it.merc);
+      return !it.cls || it.cls === c.cls;
+    });
+  }
+
+  // Stash items that beat what this character (or merc) has now.
+  function stashUpgrades(c) {
+    const b = buildOf(c);
+    if (!b) return [];
+    const out = [];
+    const haveCharms = new Set(c.charms.map((ch) => ch.item));
+    for (const entry of state.stash) {
+      const it = byName.get(entry.item);
+      if (!it) continue;
+      if (it.slot === "charm") {
+        if (b.charms.includes(it.name) && !haveCharms.has(it.name) && fitsLevel(it, c)) out.push({ entry, it, label: "Charm inventory", why: "Recommended for this build" });
+        continue;
+      }
+      let best = null;
+      for (const s of slotsFor(c, it)) {
+        const t = tierOf(b, s.key, it.name);
+        if (t === null || t < 0) continue;
+        const curName = c.gear[s.key]?.item;
+        const ct = curName ? tierOf(b, s.key, curName) : -2;
+        if (t > ct && fitsLevel(it, c) && (!best || ct < best.ct)) best = { s, t, ct, curName };
+      }
+      if (best) out.push({ entry, it, slotKey: best.s.key, label: best.s.label, tier: best.t, why: best.curName ? `Replaces ${best.curName}` : "Slot is empty" });
+    }
+    return out;
+  }
+
+  function equipFromStash(c, entry, slotKey) {
+    const it = byName.get(entry.item);
+    if (!it) return;
+    state.stash = state.stash.filter((x) => x !== entry);
+    if (it.slot === "charm") {
+      c.charms.push({ id: uid(), item: it.name, note: entry.note || "" });
+    } else {
+      const old = c.gear[slotKey];
+      if (old?.item) state.stash.push({ id: uid(), item: old.item, note: old.note || "" });
+      c.gear[slotKey] = { item: it.name, note: entry.note || "" };
+    }
+    save(); render();
+  }
+
+  function renderStash(body, c) {
+    const groups = Object.keys(SLOT_LABELS);
+    const picker = groups.map((g) => {
+      const list = ITEMS.filter((i) => i.slot === g).sort((a, z) => a.name.localeCompare(z.name));
+      return `<optgroup label="${SLOT_LABELS[g]}">${list.map((i) => `<option value="${esc(i.name)}">${esc(i.name)}${i.cls ? ` (${i.cls})` : ""}</option>`).join("")}</optgroup>`;
+    }).join("");
+    const ups = new Map(stashUpgrades(c).map((u) => [u.entry.id, u]));
+    const sections = groups.map((g) => {
+      const entries = state.stash.filter((e) => byName.get(e.item)?.slot === g);
+      if (!entries.length) return "";
+      return `<h3 class="grp">${SLOT_LABELS[g]}</h3>${entries.map((e) => {
+        const it = byName.get(e.item);
+        const u = ups.get(e.id);
+        const target = u ? u.slotKey : slotsFor(c, it)[0]?.key;
+        const canEquip = it.slot === "charm" || target;
+        return `<div class="charm-row" data-id="${e.id}">
+          <div>${itemLine(it)}${it.cls ? ` <span class="runes">${it.cls}</span>` : ""}
+            ${u ? `<div class="ok" style="font-size:13px">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
+            <div class="stats" style="font-size:13px;color:var(--muted)">${esc(it.stats)}</div>
+            <input type="text" class="note" placeholder="Rolls, sockets, ethereal…" value="${esc(e.note)}">
+          </div>
+          <div class="row-btns">
+            ${canEquip ? `<button class="btn small eq" data-slot="${target || ""}">Equip</button>` : ""}
+            <button class="btn ghost small rm" aria-label="Remove">✕</button>
+          </div>
+        </div>`;
+      }).join("")}`;
+    }).join("");
+    body.innerHTML = `
+      <div class="card">
+        <h3>Shared stash</h3>
+        <p class="notes" style="margin-top:4px">Items here are shared by all your characters. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash.</p>
+        <div class="add-row">
+          <select id="addStash">${picker}</select>
+          <button class="btn" id="addStashBtn">Add</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
+    $("#addStashBtn").onclick = () => { state.stash.push({ id: uid(), item: $("#addStash").value, note: "" }); save(); render(); };
+    body.querySelectorAll(".charm-row").forEach((row) => {
+      const e = state.stash.find((x) => x.id === row.dataset.id);
+      $(".note", row).oninput = (ev) => { e.note = ev.target.value; save(); };
+      $(".rm", row).onclick = () => { state.stash = state.stash.filter((x) => x !== e); save(); render(); };
+      const eq = $(".eq", row);
+      if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
+    });
+  }
+
   function renderUpgrades(body, c) {
     const b = buildOf(c);
     if (!b) { body.innerHTML = `<div class="card"><p>No build guide for ${esc(c.cls)} yet — gear tracking still works.</p></div>`; return; }
@@ -286,6 +399,12 @@
           <div class="notes">${cellsUsed(c)}/${INV_CELLS} cells used</div>
         </div>
       </div>
+      ${(() => {
+        const su = stashUpgrades(c);
+        if (!su.length) return "";
+        return `<div class="card up stash-card"><h3>From your stash</h3><div class="now">Already yours — free upgrades for ${esc(c.name)}</div>
+          <ul class="sugg">${su.map((u) => `<li data-id="${u.entry.id}" data-slot="${u.slotKey || ""}"><div>${itemLine(u.it)}<div class="s-stats">${esc(u.label)} · ${esc(u.why)}</div></div><button class="btn small eq">Equip</button></li>`).join("")}</ul></div>`;
+      })()}
       <div class="card notes" style="margin-bottom:12px">${esc(b.notes)}</div>
       ${todo.length ? todo.map(({ s, r }) => {
         const curIt = byName.get(c.gear[s.key]?.item);
@@ -293,10 +412,14 @@
         return `<div class="card up">
           <h3>${s.label}</h3>
           <div class="now">${now}</div>
-          <ul class="sugg">${r.items.slice(0, 4).map((x) => `<li><div>${itemLine(x.item)}<div class="s-stats">${esc(x.item.stats)}</div></div><span class="badge t${x.tier}">${x.gated ? `lvl ${x.item.req}` : TIER_NAMES[x.tier]}</span></li>`).join("")}</ul>
+          <ul class="sugg">${r.items.slice(0, 4).map((x) => `<li><div>${itemLine(x.item)}<div class="s-stats">${esc(x.item.stats)}</div>${x.stash ? "" : traderieLink(x.item)}</div><div class="badges">${x.stash ? `<span class="badge stash">In stash</span>` : ""}<span class="badge t${x.tier}">${x.gated ? `lvl ${x.item.req}` : TIER_NAMES[x.tier]}</span></div></li>`).join("")}</ul>
         </div>`;
       }).join("") : `<div class="card"><p class="ok">Every slot meets your ${TIER_NAMES[target]} target. Raise the budget target to see the next step.</p></div>`}`;
 
+    body.querySelectorAll(".stash-card li").forEach((li) => {
+      const e = state.stash.find((x) => x.id === li.dataset.id);
+      $(".eq", li).onclick = () => equipFromStash(c, e, li.dataset.slot);
+    });
     const ef = $("#extraFcr");
     if (ef) ef.onchange = (e) => { c.extraFcr = Number(e.target.value) || 0; save(); render(); };
   }
@@ -328,8 +451,13 @@
       const data = JSON.parse(await f.text());
       if (!Array.isArray(data.chars)) throw new Error("bad file");
       const replace = state.chars.length ? confirm("Replace current characters? (Cancel = merge)") : true;
-      if (replace) state = data;
-      else { const ids = new Set(state.chars.map((c) => c.id)); state.chars.push(...data.chars.filter((c) => !ids.has(c.id))); }
+      if (replace) { state = data; if (!Array.isArray(state.stash)) state.stash = []; }
+      else {
+        const ids = new Set(state.chars.map((c) => c.id));
+        state.chars.push(...data.chars.filter((c) => !ids.has(c.id)));
+        const sids = new Set(state.stash.map((s) => s.id));
+        state.stash.push(...(data.stash || []).filter((s) => !sids.has(s.id)));
+      }
       state.current = state.current || state.chars[0]?.id || null;
       save(); render();
     } catch (err) { alert("That file isn't a Gear Ledger backup."); }

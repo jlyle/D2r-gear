@@ -108,6 +108,14 @@ main { max-width: 1100px; margin: 0 auto; padding: 16px; }
 .sugg li { background: var(--panel-2); border-radius: 8px; padding: 8px 10px; display: flex; gap: 10px; justify-content: space-between; align-items: center; }
 .sugg .s-stats { font-size: 12px; color: var(--muted); }
 .ok { color: var(--good); }
+.badges { display: flex; flex-direction: column; gap: 4px; align-items: flex-end; }
+.badge.stash { color: var(--charm); border-color: var(--charm); }
+.ext { display: inline-block; margin-top: 4px; font-size: 12px; color: var(--accent); text-decoration: none; }
+.ext:hover { text-decoration: underline; }
+.stash-card { border-color: var(--charm); }
+.grp { font-size: 14px; color: var(--accent); margin: 14px 0 2px; }
+.grp:first-child { margin-top: 0; }
+.row-btns { display: flex; gap: 6px; }
 
 .inv { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin: 10px 0; }
 .inv i { aspect-ratio: 1; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); }
