@@ -29,6 +29,15 @@
   let tab = "gear";
   let pickedAcct = null;
   let stashType = "helm"; // last gear type used when adding to the stash
+  // Newest first: entries carry `added`; older ones without it keep their saved order.
+  const newestFirst = (list) => list.map((e, i) => ({ e, k: e.added || i })).sort((a, b) => b.k - a.k).map((x) => x.e);
+  const latestAdded = (list) => list.reduce((m, e) => Math.max(m, e.added || 0), 0);
+  let flashId = null; // entry to highlight and scroll to after adding
+  function showFlash(body) {
+    const el = flashId && body.querySelector(".charm-row.flash");
+    flashId = null;
+    if (el) requestAnimationFrame(() => el.scrollIntoView({ behavior: "smooth", block: "center" }));
+  }
 
   function loadAccounts() {
     try { return JSON.parse(localStorage.getItem(ACCTS_KEY)) || []; } catch (e) { return []; }
@@ -597,9 +606,9 @@
       </div>
       <div class="card" style="margin-top:12px">
         <h3>Charms</h3>
-        <div id="charmList">${c.charms.length ? c.charms.map((ch) => {
+        <div id="charmList">${c.charms.length ? newestFirst(c.charms).map((ch) => {
           const it = byName.get(ch.item);
-          return `<div class="charm-row" data-id="${ch.id}">
+          return `<div class="charm-row ${ch.id === flashId ? "flash" : ""}" data-id="${ch.id}">
             ${entryHTML(ch, it, { noteKey: ch.id })}
             <div class="row-btns"><span class="runes">${it ? `${it.size} cell${it.size > 1 ? "s" : ""}` : ""}</span><button class="btn ghost small rm" aria-label="Remove">✕</button></div>
           </div>`;
@@ -609,12 +618,13 @@
           <button class="btn" id="addCharmBtn">Add</button>
         </div>
       </div>`;
-    $("#addCharmBtn").onclick = () => { c.charms.push({ id: uid(), item: $("#addCharm").value, note: "" }); save(); render(); };
+    $("#addCharmBtn").onclick = () => { const id = uid(); c.charms.push({ id, added: Date.now(), item: $("#addCharm").value, note: "" }); flashId = id; save(); render(); };
     body.querySelectorAll(".charm-row").forEach((row) => {
       const ch = c.charms.find((x) => x.id === row.dataset.id);
       $(".rm", row).onclick = () => { c.charms = c.charms.filter((x) => x !== ch); save(); render(); };
     });
     wireEntries(body, (k) => c.charms.find((x) => x.id === k));
+    showFlash(body);
   }
 
   // Slots on this character (and merc) a given item could go into.
@@ -659,10 +669,10 @@
     if (!it) return;
     state.stash = state.stash.filter((x) => x !== entry);
     if (it.slot === "charm") {
-      c.charms.push({ id: uid(), item: it.name, note: entry.note || "" });
+      c.charms.push({ id: uid(), added: Date.now(), item: it.name, note: entry.note || "" });
     } else {
       const old = c.gear[slotKey];
-      if (old?.item) state.stash.push({ id: uid(), item: old.item, note: old.note || "" });
+      if (old?.item) state.stash.push({ id: uid(), added: Date.now(), item: old.item, note: old.note || "" });
       c.gear[slotKey] = { item: it.name, note: entry.note || "" };
     }
     save(); render();
@@ -672,15 +682,16 @@
     const groups = Object.keys(SLOT_LABELS);
     if (!STASH_TYPES.some(([g]) => g === stashType)) stashType = "helm";
     const ups = new Map(stashUpgrades(c).map((u) => [u.entry.id, u]));
-    const sections = groups.map((g) => {
-      const entries = state.stash.filter((e) => byName.get(e.item)?.slot === g);
+    const orderedGroups = groups.slice().sort((x, y) => latestAdded(state.stash.filter((e) => byName.get(e.item)?.slot === y)) - latestAdded(state.stash.filter((e) => byName.get(e.item)?.slot === x)));
+    const sections = orderedGroups.map((g) => {
+      const entries = newestFirst(state.stash.filter((e) => byName.get(e.item)?.slot === g));
       if (!entries.length) return "";
       return `<h3 class="grp">${SLOT_LABELS[g]}</h3>${entries.map((e) => {
         const it = byName.get(e.item);
         const u = ups.get(e.id);
         const target = u ? u.slotKey : slotsFor(c, it)[0]?.key;
         const canEquip = it.slot === "charm" || target;
-        return `<div class="charm-row" data-id="${e.id}">
+        return `<div class="charm-row ${e.id === flashId ? "flash" : ""}" data-id="${e.id}">
           <div>
             ${u ? `<div class="ok up-flag">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
             ${entryHTML(e, it, { noteKey: e.id })}
@@ -725,7 +736,7 @@
       $("#addStash").value = it.name;
       $("#addStashBtn").focus();
     });
-    $("#addStashBtn").onclick = () => { state.stash.push({ id: uid(), item: $("#addStash").value, note: "" }); save(); render(); };
+    $("#addStashBtn").onclick = () => { const id = uid(); state.stash.push({ id, added: Date.now(), item: $("#addStash").value, note: "" }); flashId = id; save(); render(); };
     $("#cuAdd").onclick = () => {
       let name = $("#cuName").value.trim().replace(/\s+/g, " ");
       if (!name) { $("#cuErr").textContent = "Give the item a name."; return; }
@@ -734,7 +745,8 @@
       const slot = $("#cuSlot").value;
       if (!existing) state.custom.push({ name, slot, type: $("#cuType").value, stats: "" });
       registerCustom();
-      state.stash.push({ id: uid(), item: name, note: $("#cuStats").value.trim() });
+      const nid = uid(); flashId = nid;
+      state.stash.push({ id: nid, added: Date.now(), item: name, note: $("#cuStats").value.trim() });
       stashType = slot;
       save(); render();
     };
@@ -745,6 +757,7 @@
       if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
     });
     wireEntries(body, (k) => state.stash.find((x) => x.id === k));
+    showFlash(body);
   }
 
   function renderUpgrades(body, c) {
@@ -1071,11 +1084,11 @@
     const it = r.item;
     if (!it) return;
     const entry = { item: it.name, note: r.note };
-    if (r.dest === "stash") state.stash.push({ id: uid(), ...entry });
-    else if (r.dest === "charms") c.charms.push({ id: uid(), ...entry });
+    if (r.dest === "stash") state.stash.push({ id: uid(), added: Date.now(), ...entry });
+    else if (r.dest === "charms") c.charms.push({ id: uid(), added: Date.now(), ...entry });
     else {
       const old = c.gear[r.dest];
-      if (old?.item && r.move) state.stash.push({ id: uid(), item: old.item, note: old.note || "" });
+      if (old?.item && r.move) state.stash.push({ id: uid(), added: Date.now(), item: old.item, note: old.note || "" });
       c.gear[r.dest] = entry;
     }
     save();

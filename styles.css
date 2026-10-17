@@ -245,3 +245,5 @@ dialog h2 { font-size: 18px; }
 .custom-add summary { cursor: pointer; color: var(--accent); font-size: 14px; }
 .tip-stats.mine li.check-line { color: var(--warn); }
 .chk { margin-left: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--warn); border-radius: 99px; padding: 0 6px; vertical-align: 1px; }
+.charm-row.flash .tip { animation: flash 2.2s ease-out; }
+@keyframes flash { 0%, 30% { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
