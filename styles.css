@@ -212,3 +212,5 @@ dialog h2 { font-size: 18px; }
 .photo-view { width: min(96vw, 900px); padding: 12px; }
 .photo-view img { width: 100%; max-height: 80vh; object-fit: contain; background: #000; border-radius: 6px; display: block; }
 .pv-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.tip-divider { border: 0; border-top: 2px solid var(--accent); margin: 12px 0 4px; opacity: .8; }
+.tip-stats.mine li { color: #c9d0ff; }

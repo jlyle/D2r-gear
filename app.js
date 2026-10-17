@@ -476,10 +476,8 @@
           ${it.runes ? `<div class="tip-runes">'${esc(it.runes.replace(/ /g, ""))}'</div>` : ""}
         </div>
       </div>
-      ${mine.length
-        // Actual stats from the photo (or typed in) replace the database's typical stats.
-        ? `<div class="tip-h">Actual stats</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`
-        : `<div class="tip-h">Typical stats</div><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`}
+      <div class="tip-h">Typical stats</div><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
+      ${mine.length ? `<hr class="tip-divider"><div class="tip-h">Actual stats</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
       <div class="tip-actions">
         <button class="link edit-note" type="button">✎ ${mine.length ? "Edit stats" : "Enter actual stats"}</button>
         <label class="link">📷 ${entry.photo ? "Retake photo" : "Take photo"}<input type="file" class="ph-in" accept="image/*" capture="environment" hidden></label>
