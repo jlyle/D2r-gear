@@ -5,7 +5,8 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 **Live site:** https://jlyle.github.io/D2r-gear/
 
 ## Features
-- Roster of characters, saved in the browser (Export/Import backup to move between devices)
+- Password-protected accounts, each with up to 10 characters and its own shared stash. Data is encrypted (AES-GCM, PBKDF2 key) and stored in the browser only; a forgotten password can't be recovered.
+- Export account backup (still encrypted) / Import to move an account between devices
 - Slot-by-slot gear picker with uniques, sets, runewords and common rare/crafted types
 - Mercenary weapon, helm and armor
 - Charm inventory with 10×4 cell usage and duplicate-unique warnings

@@ -4,27 +4,30 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Gear Ledger</title>
-  <meta name="description" content="Track Diablo II: Resurrected character gear, charms and mercenary, and get upgrade recommendations by build and budget.">
+  <meta name="description" content="Track Diablo II: Resurrected character gear, charms, stash and mercenary, and get upgrade recommendations by build and budget.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="locked">
   <header class="top">
     <div class="brand">
       <h1>Gear Ledger</h1>
-      <span class="sub">D2R inventory &amp; upgrades</span>
+      <span class="sub" id="acctName">D2R inventory &amp; upgrades</span>
     </div>
     <div class="roster">
       <select id="charSelect" aria-label="Character"></select>
       <button id="newChar" class="btn">+ New</button>
+      <button id="lockBtn" class="btn ghost" title="Lock account" aria-label="Lock account">🔒</button>
       <details class="menu">
         <summary class="btn ghost" aria-label="More">⋯</summary>
         <div class="menu-pop">
-          <button id="exportBtn">Export backup</button>
+          <button id="exportBtn">Export account backup</button>
           <label class="file-label">Import backup<input id="importFile" type="file" accept="application/json"></label>
+          <button id="changePw">Change password</button>
           <button id="deleteChar" class="danger">Delete character</button>
+          <button id="deleteAcct" class="danger">Delete account</button>
         </div>
       </details>
     </div>
@@ -32,8 +35,22 @@
 
   <main id="app"></main>
 
+  <dialog id="pwDialog">
+    <form method="dialog" class="stack">
+      <h2>Change password</h2>
+      <label class="field"><span>New password</span><input type="password" id="pw1" autocomplete="new-password"></label>
+      <label class="field"><span>Confirm new password</span><input type="password" id="pw2" autocomplete="new-password"></label>
+      <p class="err" id="pwErr"></p>
+      <div class="row-btns end">
+        <button class="btn ghost" value="cancel" formnovalidate>Cancel</button>
+        <button class="btn" value="ok">Save</button>
+      </div>
+    </form>
+  </dialog>
+
   <footer class="foot">
-    Saved in this browser. Use <b>Export backup</b> to move characters between devices.
+    Accounts are encrypted with their passwords and saved in this browser only.
+    Use <b>Export account backup</b> to move one to another device.
     Fan-made tool, not affiliated with Blizzard Entertainment.
   </footer>
 

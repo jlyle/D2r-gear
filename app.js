@@ -8,10 +8,74 @@
   const byName = new Map(ITEMS.map((i) => [i.name, i]));
   const uid = () => Math.random().toString(36).slice(2, 10);
 
-  // ---------- state ----------
-  let state = load();
-  if (!Array.isArray(state.stash)) state.stash = []; // shared stash, across all characters
+  // ---------- accounts (encrypted on this device) ----------
+  // Each account: { id, name, salt, iv, data } — data is AES-GCM ciphertext of
+  // { chars, stash, current }, keyed by PBKDF2 of the account password.
+  const ACCTS_KEY = "gearLedger.accounts.v2";
+  const MAX_CHARS = 10;
+  const PBKDF2_ITERS = 250000;
+  const enc = new TextEncoder(), dec = new TextDecoder();
+  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const unb64 = (s) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
+
+  let accounts = loadAccounts();
+  let session = null; // { acct, key } while unlocked
+  let state = null;   // decrypted { chars, stash, current } of the unlocked account
   let tab = "gear";
+  let pickedAcct = null;
+
+  function loadAccounts() {
+    try { return JSON.parse(localStorage.getItem(ACCTS_KEY)) || []; } catch (e) { return []; }
+  }
+  function writeAccounts() {
+    try { localStorage.setItem(ACCTS_KEY, JSON.stringify(accounts)); return true; }
+    catch (e) { alert("Couldn't save — browser storage is unavailable or full."); return false; }
+  }
+  async function deriveKey(password, salt) {
+    const base = await crypto.subtle.importKey("raw", enc.encode(password), "PBKDF2", false, ["deriveKey"]);
+    return crypto.subtle.deriveKey({ name: "PBKDF2", salt, iterations: PBKDF2_ITERS, hash: "SHA-256" }, base, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+  }
+  async function sealInto(acct, key, data) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, enc.encode(JSON.stringify(data)));
+    acct.iv = b64(iv); acct.data = b64(ct);
+  }
+  async function openAcct(acct, password) {
+    const key = await deriveKey(password, unb64(acct.salt));
+    const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(acct.iv) }, key, unb64(acct.data)); // throws on wrong password
+    return { key, data: JSON.parse(dec.decode(pt)) };
+  }
+  async function createAccount(name, password, data) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const acct = { id: uid(), name, salt: b64(salt), created: Date.now() };
+    const key = await deriveKey(password, salt);
+    await sealInto(acct, key, data);
+    accounts.push(acct);
+    if (!writeAccounts()) { accounts.pop(); return null; }
+    return { acct, key };
+  }
+  function normalize(d) {
+    d = d || {};
+    if (!Array.isArray(d.chars)) d.chars = [];
+    if (!Array.isArray(d.stash)) d.stash = [];
+    if (!d.current && d.chars.length) d.current = d.chars[0].id;
+    return d;
+  }
+
+  // Saves are encrypted asynchronously; queue so writes land in order.
+  let saveChain = Promise.resolve();
+  function save() {
+    if (!session) return;
+    const { acct, key } = session;
+    const snapshot = JSON.parse(JSON.stringify(state));
+    saveChain = saveChain.then(async () => { await sealInto(acct, key, snapshot); writeAccounts(); }).catch(() => {});
+  }
+  function lock() { session = null; state = null; pickedAcct = null; tab = "gear"; render(); }
+
+  // Characters saved by the earlier single-user version (plain, unencrypted).
+  function legacyData() {
+    try { const raw = localStorage.getItem(STORE_KEY); return raw ? normalize(JSON.parse(raw)) : null; } catch (e) { return null; }
+  }
 
   const SLOT_LABELS = { helm: "Helms", amulet: "Amulets", ring: "Rings", weapon: "Weapons", offhand: "Shields & off-hands", armor: "Armor", gloves: "Gloves", belt: "Belts", boots: "Boots", charm: "Charms" };
   const inStash = (name) => state.stash.some((s) => s.item === name);
@@ -22,20 +86,11 @@
     return `<a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(q)}" target="_blank" rel="noopener">Traderie ↗</a>`;
   }
 
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORE_KEY);
-      if (raw) return JSON.parse(raw);
-    } catch (e) { /* storage unavailable */ }
-    return { chars: [], current: null };
-  }
-  function save() {
-    try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* ignore */ }
-  }
   const cur = () => state.chars.find((c) => c.id === state.current) || null;
   const buildOf = (c) => BUILDS.find((b) => b.id === c.build) || null;
 
   function newChar() {
+    if (state.chars.length >= MAX_CHARS) { alert(`An account holds up to ${MAX_CHARS} characters. Delete one or use another account.`); return; }
     const name = prompt("Character name?", "New hero");
     if (name === null) return;
     const c = { id: uid(), name: name.trim() || "New hero", cls: "Sorceress", level: 1, build: "blizz-sorc", budget: 1, mode: "Softcore", extraFcr: 0, gear: {}, charms: [] };
@@ -100,6 +155,8 @@
 
   // ---------- render ----------
   function render() {
+    document.body.classList.toggle("locked", !session);
+    if (!session) { $("#acctName").textContent = "D2R inventory & upgrades"; renderLogin(); return; }
     renderRoster();
     const c = cur();
     const app = $("#app");
@@ -150,6 +207,131 @@
       ? state.chars.map((c) => `<option value="${c.id}" ${c.id === state.current ? "selected" : ""}>${esc(c.name)} — ${esc(c.cls)} ${esc(c.level)}</option>`).join("")
       : `<option>No characters</option>`;
     sel.disabled = !state.chars.length;
+    $("#acctName").textContent = `${session.acct.name} · ${state.chars.length}/${MAX_CHARS}`;
+    $("#newChar").disabled = state.chars.length >= MAX_CHARS;
+  }
+
+  // ---------- login / account screens ----------
+  function renderLogin() {
+    const app = $("#app");
+    const legacy = legacyData();
+    const list = accounts.map((a) => `<button class="acct ${pickedAcct === a.id ? "on" : ""}" data-id="${a.id}"><span class="acct-ico">🔒</span>${esc(a.name)}</button>`).join("");
+    const picked = accounts.find((a) => a.id === pickedAcct);
+    app.innerHTML = `
+      <div class="login">
+        ${accounts.length ? `<section class="card">
+          <h2>Accounts</h2>
+          <div class="acct-list">${list}</div>
+          ${picked ? `<form id="unlockForm" class="stack">
+            <label class="field"><span>Password for ${esc(picked.name)}</span><input type="password" id="unlockPw" autocomplete="current-password" required></label>
+            <button class="btn" type="submit">Unlock</button>
+            <p class="err" id="unlockErr"></p>
+          </form>` : `<p class="notes">Pick an account to unlock it.</p>`}
+        </section>` : ""}
+        <section class="card">
+          <h2>${accounts.length ? "New account" : "Create your first account"}</h2>
+          <p class="notes">Each account holds up to ${MAX_CHARS} characters and its own shared stash, locked with its password on this device. <b>A forgotten password can't be recovered.</b></p>
+          <form id="createForm" class="stack">
+            <label class="field"><span>Account name</span><input type="text" id="newName" placeholder="e.g. Main, Ladder, Hardcore" required maxlength="40"></label>
+            <label class="field"><span>Password</span><input type="password" id="newPw" autocomplete="new-password" required minlength="4"></label>
+            <label class="field"><span>Confirm password</span><input type="password" id="newPw2" autocomplete="new-password" required></label>
+            ${legacy && legacy.chars.length ? `<label class="check"><input type="checkbox" id="moveLegacy" checked> Move my ${legacy.chars.length} existing character${legacy.chars.length > 1 ? "s" : ""} and stash into this account</label>` : ""}
+            <button class="btn" type="submit">Create account</button>
+            <p class="err" id="createErr"></p>
+          </form>
+        </section>
+        <section class="card">
+          <h2>Restore</h2>
+          <p class="notes">Import an account backup exported from another device. You'll unlock it with its original password.</p>
+          <label class="btn ghost file-btn">Import account backup<input type="file" id="loginImport" accept="application/json"></label>
+        </section>
+      </div>`;
+
+    app.querySelectorAll(".acct").forEach((b) => (b.onclick = () => { pickedAcct = b.dataset.id; renderLogin(); $("#unlockPw")?.focus(); }));
+    const uf = $("#unlockForm");
+    if (uf) uf.onsubmit = async (e) => {
+      e.preventDefault();
+      const btn = $("button", uf); btn.disabled = true; btn.textContent = "Unlocking…";
+      try {
+        const { key, data } = await openAcct(picked, $("#unlockPw").value);
+        session = { acct: picked, key }; state = normalize(data); render();
+      } catch (err) {
+        btn.disabled = false; btn.textContent = "Unlock";
+        $("#unlockErr").textContent = "Wrong password.";
+        $("#unlockPw").select();
+      }
+    };
+    $("#createForm").onsubmit = async (e) => {
+      e.preventDefault();
+      const name = $("#newName").value.trim(), pw = $("#newPw").value;
+      const errEl = $("#createErr");
+      if (pw !== $("#newPw2").value) { errEl.textContent = "Passwords don't match."; return; }
+      if (accounts.some((a) => a.name.toLowerCase() === name.toLowerCase())) { errEl.textContent = "There's already an account with that name."; return; }
+      const move = $("#moveLegacy")?.checked;
+      let data = normalize(move ? legacy : null);
+      if (data.chars.length > MAX_CHARS) { errEl.textContent = `You have ${data.chars.length} existing characters; only the first ${MAX_CHARS} will be moved.`; data.chars = data.chars.slice(0, MAX_CHARS); }
+      const s = await createAccount(name, pw, data);
+      if (!s) return;
+      if (move) { try { localStorage.removeItem(STORE_KEY); } catch (err) { /* ignore */ } }
+      session = s; state = data; render();
+    };
+    $("#loginImport").onchange = (e) => importFile(e);
+  }
+
+  function addImportedAccount(rec) {
+    let name = rec.name || "Imported", n = 2;
+    while (accounts.some((a) => a.name.toLowerCase() === name.toLowerCase())) name = `${rec.name} (${n++})`;
+    const acct = { id: uid(), name, salt: rec.salt, iv: rec.iv, data: rec.data, created: Date.now() };
+    accounts.push(acct);
+    writeAccounts();
+    return acct;
+  }
+
+  async function importFile(e) {
+    const f = e.target.files[0];
+    e.target.value = "";
+    $(".menu").open = false;
+    if (!f) return;
+    let data;
+    try { data = JSON.parse(await f.text()); } catch (err) { alert("That file isn't a Gear Ledger backup."); return; }
+    if (data.format === "gear-ledger-account" && data.salt && data.iv && data.data) {
+      const acct = addImportedAccount(data);
+      alert(`Added account "${acct.name}". Unlock it with its password.`);
+      if (session) lock(); else { pickedAcct = acct.id; render(); }
+      return;
+    }
+    if (Array.isArray(data.chars)) {
+      if (!session) { alert("That's an older single-list backup. Unlock or create an account first, then import it from the ⋯ menu."); return; }
+      const ids = new Set(state.chars.map((c) => c.id));
+      const incoming = data.chars.filter((c) => !ids.has(c.id));
+      const room = MAX_CHARS - state.chars.length;
+      state.chars.push(...incoming.slice(0, room));
+      const sids = new Set(state.stash.map((s) => s.id));
+      state.stash.push(...(data.stash || []).filter((s) => !sids.has(s.id)));
+      state.current = state.current || state.chars[0]?.id || null;
+      save(); render();
+      if (incoming.length > room) alert(`Only ${room} character${room === 1 ? "" : "s"} fit (limit ${MAX_CHARS} per account).`);
+      return;
+    }
+    alert("That file isn't a Gear Ledger backup.");
+  }
+
+  // Small password dialog (change password).
+  function pwDialog() {
+    return new Promise((resolve) => {
+      const d = $("#pwDialog");
+      const f = $("form", d);
+      f.reset(); $("#pwErr").textContent = "";
+      d.showModal();
+      f.onsubmit = (e) => {
+        e.preventDefault();
+        if (e.submitter?.value === "cancel") { d.close(); resolve(null); return; }
+        const a = $("#pw1").value, b = $("#pw2").value;
+        if (a.length < 4) { $("#pwErr").textContent = "Use at least 4 characters."; return; }
+        if (a !== b) { $("#pwErr").textContent = "Passwords don't match."; return; }
+        d.close(); resolve(a);
+      };
+    });
   }
 
   function itemOptions(c, slot, selected) {
@@ -435,36 +617,43 @@
     save(); render();
     $(".menu").open = false;
   };
-  $("#exportBtn").onclick = () => {
-    const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  // Export = the encrypted account record; still needs the password to open.
+  $("#exportBtn").onclick = async () => {
+    $(".menu").open = false;
+    await saveChain;
+    const { name, salt, iv, data } = session.acct;
+    const blob = new Blob([JSON.stringify({ format: "gear-ledger-account", v: 2, name, salt, iv, data }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `gear-ledger-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `gear-ledger-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    $(".menu").open = false;
   };
-  $("#importFile").onchange = async (e) => {
-    const f = e.target.files[0];
-    if (!f) return;
-    try {
-      const data = JSON.parse(await f.text());
-      if (!Array.isArray(data.chars)) throw new Error("bad file");
-      const replace = state.chars.length ? confirm("Replace current characters? (Cancel = merge)") : true;
-      if (replace) { state = data; if (!Array.isArray(state.stash)) state.stash = []; }
-      else {
-        const ids = new Set(state.chars.map((c) => c.id));
-        state.chars.push(...data.chars.filter((c) => !ids.has(c.id)));
-        const sids = new Set(state.stash.map((s) => s.id));
-        state.stash.push(...(data.stash || []).filter((s) => !sids.has(s.id)));
-      }
-      state.current = state.current || state.chars[0]?.id || null;
-      save(); render();
-    } catch (err) { alert("That file isn't a Gear Ledger backup."); }
-    e.target.value = "";
+  $("#importFile").onchange = (e) => importFile(e);
+  $("#lockBtn").onclick = async () => { await saveChain; lock(); };
+  $("#changePw").onclick = async () => {
     $(".menu").open = false;
+    const pw = await pwDialog();
+    if (!pw) return;
+    await saveChain;
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await deriveKey(pw, salt);
+    session.acct.salt = b64(salt);
+    await sealInto(session.acct, key, state);
+    session.key = key;
+    writeAccounts();
+    alert("Password changed. Backups exported before now still use the old password.");
+  };
+  $("#deleteAcct").onclick = async () => {
+    $(".menu").open = false;
+    const a = session.acct;
+    const typed = prompt(`This permanently deletes the account "${a.name}", its ${state.chars.length} character(s) and its stash from this device.\n\nType the account name to confirm:`);
+    if (typed === null || typed.trim() !== a.name) return;
+    await saveChain;
+    accounts = accounts.filter((x) => x.id !== a.id);
+    writeAccounts();
+    lock();
   };
 
-  if (!state.current && state.chars.length) state.current = state.chars[0].id;
   render();
 })();
