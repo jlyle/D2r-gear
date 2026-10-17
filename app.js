@@ -179,6 +179,7 @@
       <nav class="tabs" role="tablist">
         ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
+      ${tab !== "upgrades" ? `<div class="scan-row"><label class="btn ghost scan-btn">📷 Add gear from photos<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Snap the item tooltip — straight on, whole box in frame.</span></div>` : ""}
       <section id="tabBody"></section>`;
 
     $("#fName").oninput = (e) => { c.name = e.target.value; save(); renderRoster(); };
@@ -193,6 +194,8 @@
     $("#fBudget").onchange = (e) => { c.budget = Number(e.target.value); save(); render(); };
     $("#fMode").onchange = (e) => { c.mode = e.target.value; save(); };
     app.querySelectorAll(".tab").forEach((t) => (t.onclick = () => { tab = t.dataset.tab; render(); }));
+    const si = $("#scanInput");
+    if (si) si.onchange = (e) => { const files = [...e.target.files]; e.target.value = ""; scanPhotos(c, files); };
 
     const body = $("#tabBody");
     if (tab === "gear") renderSlots(body, c, GEAR_SLOTS);
@@ -607,6 +610,232 @@
     });
     const ef = $("#extraFcr");
     if (ef) ef.onchange = (e) => { c.extraFcr = Number(e.target.value) || 0; save(); render(); };
+  }
+
+  // ---------- add gear from photos (on-device OCR) ----------
+  // Tesseract.js is loaded from the CDN on first use; photos never leave the device
+  // and aren't stored — only the matched item and its stat lines are saved.
+  const TESS_URL = "https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js";
+  let ocrWorker = null;
+
+  function loadScript(src) {
+    return new Promise((res, rej) => {
+      const s = document.createElement("script");
+      s.src = src; s.onload = res; s.onerror = () => rej(new Error("load failed"));
+      document.head.appendChild(s);
+    });
+  }
+  async function getWorker(progress) {
+    if (ocrWorker) return ocrWorker;
+    if (!window.Tesseract) await loadScript(TESS_URL);
+    progress("Loading text reader (first time only)…");
+    ocrWorker = await Tesseract.createWorker("eng", 1, {
+      logger: (m) => { if (m.status === "recognizing text") progress(`Reading text… ${Math.round(m.progress * 100)}%`); },
+    });
+    return ocrWorker;
+  }
+
+  // Grayscale, invert (tooltips are light text on black) and stretch contrast.
+  async function prepImage(file) {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
+    const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
+    const cv = document.createElement("canvas");
+    cv.width = w; cv.height = h;
+    const ctx = cv.getContext("2d");
+    ctx.drawImage(bmp, 0, 0, w, h);
+    const img = ctx.getImageData(0, 0, w, h), d = img.data;
+    for (let i = 0; i < d.length; i += 4) {
+      const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+      const v = Math.max(0, Math.min(255, (255 - g - 40) * 1.6));
+      d[i] = d[i + 1] = d[i + 2] = v;
+    }
+    ctx.putImageData(img, 0, 0);
+    return cv;
+  }
+
+  const norm = (s) => s.toLowerCase().replace(/[’`]/g, "'").replace(/[^a-z0-9' ]+/g, " ").replace(/\s+/g, " ").trim();
+  function lev(a, b) {
+    const m = a.length, n = b.length;
+    if (!m || !n) return m || n;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      const row = [i];
+      for (let j = 1; j <= n; j++) row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      prev = row;
+    }
+    return prev[n];
+  }
+  const sim = (a, b) => 1 - lev(a, b) / Math.max(a.length, b.length);
+
+  // Generic rare/crafted fallbacks by base-type words in the tooltip.
+  const BASE_HINTS = [
+    [/\b(small charm)\b/, (t) => /hit recovery/.test(t) ? "Small charm — FHR" : /magic items/.test(t) ? "Small charm — MF" : "Small charm — life/res"],
+    [/\b(large charm)\b/, () => "Large charm"],
+    [/\b(grand charm)\b/, (t) => /\+1 to .*skills/.test(t) ? "Skiller grand charm" : "Grand charm (other)"],
+    [/\b(circlet|coronet|tiara|diadem)\b/, () => "Rare caster circlet"],
+    [/\bring\b/, (t) => /cast rate/.test(t) ? "Rare/Crafted FCR ring" : "Rare melee ring"],
+    [/\bamulet\b/, (t) => /cast rate/.test(t) && /\+2 to/.test(t) ? "2/20 caster amulet" : /\+3 to/.test(t) ? "Rare +3 skill-tree amulet" : "Rare amulet"],
+    [/\b(boots|greaves|shoes|treads)\b/, () => "Rare tri-res boots"],
+    [/\b(sash|belt|girdle)\b/, () => "Rare/Crafted belt"],
+    [/\b(claws?|katar|talons?|scissors|blade talons|runic talons)\b/, () => "Rare trap claw"],
+    [/\b(dagger|kris|dirk|blade|poignard|mithril point|stiletto)\b/, () => "Rare Warlock dagger"],
+    [/\b(pelt|hawk helm|antlers|totem|wolf head|spirit mask)\b/, (t) => /shape shifting/.test(t) ? "Rare Shape Shifting pelt" : "Rare druid pelt"],
+    [/\b(gauntlets|gloves|vambraces|bracers)\b/, (t) => /javelin/.test(t) ? "Rare javelin gloves" : /bow and crossbow/.test(t) ? "Rare bow gloves" : "Crafted Blood gloves"],
+    [/\b(head|preserved head|zombie head|fetish trophy|hierophant trophy)\b/, () => "Rare necro head"],
+  ];
+
+  function matchItems(text) {
+    const lines = text.split(/\n+/).map(norm).filter((l) => l.length >= 3);
+    const flat = norm(text).replace(/[ ']/g, "");
+    const scored = [];
+    for (const it of ITEMS) {
+      if (it.type === "rare" || (it.type === "charm" && !it.unique1)) continue;
+      const names = [it.name.replace(/ \((sword|shield|helm|weapon)\)$/, ""), it.alias].filter(Boolean).map(norm);
+      let best = 0;
+      for (const nm of names) for (const l of lines) {
+        if (nm.length >= 6 && l.includes(nm)) best = Math.max(best, 1);
+        else best = Math.max(best, sim(l, nm));
+      }
+      if (it.runes && flat.includes(norm(it.runes).replace(/ /g, ""))) best = Math.max(best, 0.97); // rune recipe line
+      if (best >= 0.6) scored.push({ it, score: best });
+    }
+    // Spirit / Dream / Fortitude share a name: prefer the one matching the base type.
+    const shieldy = /(shield|monarch|targe|aegis|ward|pavise|buckler|grimoire|tome|codex|trophy|head)/.test(norm(text));
+    scored.forEach((s) => {
+      if (/\((shield)\)$/.test(s.it.name)) s.score += shieldy ? 0.01 : -0.01;
+      if (/\((sword|weapon)\)$/.test(s.it.name)) s.score += shieldy ? -0.01 : 0.01;
+    });
+    scored.sort((a, z) => z.score - a.score);
+    const out = scored.slice(0, 4);
+    if (!out.length || out[0].score < 0.8) {
+      // Weak name match: probably a rare/magic item — lead with a base-type guess.
+      const t = text.toLowerCase().replace(/\s+/g, " ");
+      for (const [re, pick] of BASE_HINTS) if (re.test(t)) { const it = byName.get(pick(t)); if (it && !out.some((o) => o.it === it)) out.unshift({ it, score: 0.5, guess: true }); break; }
+    }
+    return out;
+  }
+
+  // Stat lines worth keeping in the notes: drop the item name, base type and rune lines.
+  function statNotes(text, it) {
+    const skip = /^(required|durability|defense|item version|sell value|shift|one hand damage|two hand damage|throw damage|quantity|class|\(.*only\)|keep in inventory|socketed|ethereal)/i;
+    const runeLine = /^['‘’"]?([A-Z][a-z]{1,4}){2,6}['‘’"]?$/;
+    const lines = text.split(/\n+/).map((l) => l.trim()).filter((l) => l.length > 2);
+    const names = it ? [it.name.replace(/ \((sword|shield|helm|weapon)\)$/, ""), it.alias].filter(Boolean).map(norm) : [];
+    let nameIdx = lines.findIndex((l) => names.some((n) => sim(norm(l), n) >= 0.75));
+    const start = nameIdx >= 0 ? nameIdx + 2 : Math.min(2, Math.max(0, lines.length - 3)); // name + base type
+    return lines.slice(start).filter((l) => !skip.test(l) && !runeLine.test(l.replace(/\s/g, "")))
+      .slice(0, 12).join(" · ").slice(0, 300);
+  }
+
+  function destinations(c, it) {
+    const opts = [];
+    if (it.slot === "charm") opts.push({ v: "charms", l: `${c.name}'s charms` });
+    else for (const s of slotsFor(c, it)) {
+      const curIt = c.gear[s.key]?.item;
+      opts.push({ v: s.key, l: `${s.label}${curIt ? ` (replaces ${curIt})` : " (empty)"}` });
+    }
+    opts.push({ v: "stash", l: "Shared stash" });
+    return opts;
+  }
+  function defaultDest(c, it) {
+    if (it.slot === "charm") return "charms";
+    const slots = slotsFor(c, it).filter((s) => s.key !== "swap" && !s.key.startsWith("merc"));
+    const pool = slots.length ? slots : slotsFor(c, it);
+    if (tab === "merc") { const m = slotsFor(c, it).find((s) => s.key.startsWith("merc")); if (m) return m.key; }
+    if (tab === "stash") return "stash";
+    return (pool.find((s) => !c.gear[s.key]?.item) || pool[0])?.key || "stash";
+  }
+
+  function reviewDialog(c, file, text, cands, idx, total) {
+    return new Promise((resolve) => {
+      const d = $("#scanDialog");
+      const url = URL.createObjectURL(file);
+      const allOpts = Object.keys(SLOT_LABELS).map((g) => `<optgroup label="${SLOT_LABELS[g]}">${ITEMS.filter((i) => i.slot === g).map((i) => `<option value="${esc(i.name)}">${esc(i.name)}</option>`).join("")}</optgroup>`).join("");
+      d.innerHTML = `<form method="dialog" class="stack">
+        <h2>Photo ${idx + 1} of ${total}</h2>
+        <img class="scan-thumb" src="${url}" alt="Your photo">
+        ${cands.length ? `<div class="field"><span>Best match${cands.length > 1 ? "es" : ""}</span>
+          <div class="cands">${cands.map((x, i) => `<label class="cand"><input type="radio" name="cand" value="${esc(x.it.name)}" ${i === 0 ? "checked" : ""}> ${itemLine(x.it)} <span class="runes">${x.guess ? "best guess from base type" : Math.round(Math.min(1, x.score) * 100) + "% match"}</span></label>`).join("")}
+          <label class="cand"><input type="radio" name="cand" value=""> Something else…</label></div></div>`
+          : `<p class="err">Couldn't recognise the item name. Pick it below — retaking the photo closer and straight on usually helps.</p>`}
+        <label class="field" id="otherWrap" ${cands.length ? "hidden" : ""}><span>Item</span><select id="scanOther">${allOpts}</select></label>
+        <label class="field"><span>Put it in</span><select id="scanDest"></select></label>
+        <label class="check" id="moveWrap"><input type="checkbox" id="scanMove" checked> Move the replaced item to the shared stash</label>
+        <label class="field"><span>Notes (stats read from the photo — edit as needed)</span><textarea id="scanNote" rows="4"></textarea></label>
+        <details class="raw"><summary>Text read from photo</summary><pre>${esc(text.trim()) || "(nothing)"}</pre></details>
+        <div class="row-btns end">
+          <button class="btn ghost" value="skip" formnovalidate>Skip</button>
+          ${idx + 1 < total ? `<button class="btn ghost" value="stop" formnovalidate>Stop</button>` : ""}
+          <button class="btn" value="ok">Save</button>
+        </div>
+      </form>`;
+      const chosen = () => {
+        const r = $('input[name="cand"]:checked', d);
+        return byName.get(r && r.value ? r.value : $("#scanOther").value);
+      };
+      const refresh = (resetNote) => {
+        const it = chosen();
+        $("#otherWrap").hidden = !!(cands.length && $('input[name="cand"]:checked', d)?.value);
+        const dest = defaultDest(c, it);
+        $("#scanDest").innerHTML = destinations(c, it).map((o) => `<option value="${o.v}" ${o.v === dest ? "selected" : ""}>${esc(o.l)}</option>`).join("");
+        refreshMove();
+        if (resetNote) $("#scanNote").value = statNotes(text, it);
+      };
+      const refreshMove = () => {
+        const v = $("#scanDest").value;
+        $("#moveWrap").hidden = !(v !== "stash" && v !== "charms" && c.gear[v]?.item);
+      };
+      d.querySelectorAll('input[name="cand"]').forEach((r) => (r.onchange = () => refresh(true)));
+      $("#scanOther").onchange = () => refresh(true);
+      $("#scanDest").onchange = refreshMove;
+      refresh(true);
+      d.showModal();
+      $("form", d).onsubmit = (e) => {
+        e.preventDefault();
+        const action = e.submitter?.value || "ok";
+        d.close(); URL.revokeObjectURL(url);
+        if (action !== "ok") return resolve(action);
+        resolve({ item: chosen(), dest: $("#scanDest").value, note: $("#scanNote").value.trim(), move: $("#scanMove").checked });
+      };
+      d.oncancel = () => { URL.revokeObjectURL(url); resolve("stop"); };
+    });
+  }
+
+  function applyScan(c, r) {
+    const it = r.item;
+    if (!it) return;
+    if (r.dest === "stash") state.stash.push({ id: uid(), item: it.name, note: r.note });
+    else if (r.dest === "charms") c.charms.push({ id: uid(), item: it.name, note: r.note });
+    else {
+      const old = c.gear[r.dest];
+      if (old?.item && r.move) state.stash.push({ id: uid(), item: old.item, note: old.note || "" });
+      c.gear[r.dest] = { item: it.name, note: r.note };
+    }
+    save();
+  }
+
+  async function scanPhotos(c, files) {
+    if (!files.length) return;
+    const status = $("#scanStatus");
+    const progress = (msg) => { status.textContent = msg; status.hidden = false; };
+    let added = 0;
+    try {
+      const worker = await getWorker(progress);
+      for (let i = 0; i < files.length; i++) {
+        progress(`Reading photo ${i + 1} of ${files.length}…`);
+        const canvas = await prepImage(files[i]);
+        const { data } = await worker.recognize(canvas);
+        status.hidden = true;
+        const res = await reviewDialog(c, files[i], data.text || "", matchItems(data.text || ""), i, files.length);
+        if (res === "stop") break;
+        if (res !== "skip") { applyScan(c, res); added++; render(); }
+      }
+    } catch (err) {
+      alert("Couldn't read photos — the text reader needs an internet connection the first time it loads.");
+    }
+    status.hidden = true;
+    if (added) render();
   }
 
   // ---------- header actions ----------

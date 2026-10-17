@@ -12,6 +12,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 - Charm inventory with 10×4 cell usage and duplicate-unique warnings
 - Shared stash (all characters): flags stash items that upgrade the current character, one-tap Equip that swaps the worn item back to stash
 - Top 5 builds for every class, including the Warlock (Season 15 / Patch 3.3, Reign of the Warlock), with Starter/Mid/Endgame gear per slot
+- Add gear from photos: snap item tooltips, on-device OCR (Tesseract.js) matches the item, pre-picks the slot and fills notes with the stats; photos aren't stored
 - Upgrades tab: stash upgrades first, then per-slot suggestions with Traderie links, FCR breakpoint check for caster builds, missing charms
 
 ## Editing data
