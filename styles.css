@@ -234,3 +234,12 @@ dialog h2 { font-size: 18px; }
 .isearch-res .item-ico svg { width: 26px; height: 26px; }
 .isearch-res small { display: block; color: var(--muted); font-size: 12px; }
 .isearch-res .none { color: var(--muted); padding: 8px; font-size: 13px; }
+
+/* stash goods + custom items */
+.n-rune { color: #ffa800; }
+.n-gem { color: #e8e8e8; }
+.n-jewel { color: #8f9bff; }
+.n-magic { color: #8080ff; }
+.n-misc { color: #c8b89a; }
+.custom-add { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
+.custom-add summary { cursor: pointer; color: var(--accent); font-size: 14px; }

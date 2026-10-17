@@ -43,6 +43,15 @@
     boots: '<path d="M14 8h11v20l12 5c3 1 4 3 4 6v3H10V30z"/><path d="M14 16h11M10 36h31"/>',
     amulet: '<path d="M10 8c0 12 6 18 14 22 8-4 14-10 14-22"/><path d="M24 30l7 8-7 6-7-6z"/>',
     ring: '<circle cx="24" cy="28" r="12"/><circle cx="24" cy="28" r="7"/><path d="M19 15l5-7 5 7z"/>',
+    // stash goods
+    rune: '<path d="M14 8h20l6 16-6 16H14L8 24z"/><path d="M20 16l8 0-6 8 6 8h-8"/>',
+    gem: '<path d="M14 10h20l6 10-16 20L8 20z"/><path d="M8 20h32M20 10l-4 10 8 20 8-20-4-10"/>',
+    jewel: '<path d="M24 6l14 10-5 18H15l-5-18z"/><path d="M24 6v28M10 16h28"/><circle cx="24" cy="20" r="4"/>',
+    key: '<circle cx="14" cy="24" r="7"/><path d="M21 24h21M34 24v6M39 24v4"/>',
+    organ: '<path d="M16 12c-6 0-9 6-7 12 2 8 9 14 15 16 6-2 13-8 15-16 2-6-1-12-7-12-4 0-6 2-8 5-2-3-4-5-8-5z"/><path d="M18 22c2 2 4 2 6 0 2 2 4 2 6 0"/>',
+    essence: '<path d="M18 6h12M20 6v8l-8 14a8 8 0 0 0 7 12h10a8 8 0 0 0 7-12l-8-14V6"/><path d="M15 30h18"/>',
+    token: '<circle cx="24" cy="24" r="16"/><circle cx="24" cy="24" r="10"/><path d="M24 16v16M16 24h16"/>',
+    misc: '<path d="M10 16l14-8 14 8v16l-14 8-14-8z"/><path d="M10 16l14 8 14-8M24 24v16"/>',
     // charms by size
     small: '<rect x="16" y="16" width="16" height="16" rx="3"/><path d="M24 20l4 4-4 4-4-4z"/>',
     large: '<rect x="16" y="8" width="16" height="32" rx="3"/><path d="M24 17l4 7-4 7-4-7z"/>',
@@ -70,9 +79,13 @@
     "Homunculus": "head", "Rare necro head": "head",
     "Skin of the Vipermagi": "light", "Stealth": "light", "Smoke": "light", "Treachery": "light", "Horazon's Dominion": "light", "Ormus' Robes": "robe",
     "Steelrend": "gauntlets", "Dracul's Grasp": "gauntlets", "Soul Drainer": "gauntlets", "Crafted Blood gloves": "gauntlets",
+    "Key of Terror": "key", "Key of Hate": "key", "Key of Destruction": "key",
+    "Mephisto's Brain": "organ", "Diablo's Horn": "organ", "Baal's Eye": "organ",
+    "Twisted Essence of Suffering": "essence", "Charged Essence of Hatred": "essence", "Burning Essence of Terror": "essence", "Festering Essence of Destruction": "essence",
+    "Token of Absolution": "token", "Standard of Heroes": "token",
     "Arachnid Mesh": "sash", "String of Ears": "sash", "Goldwrap": "sash",
   };
-  const BY_SLOT = { helm: "helm", weapon: "sword", offhand: "shield", armor: "plate", gloves: "gloves", belt: "belt", boots: "boots", amulet: "amulet", ring: "ring" };
+  const BY_SLOT = { helm: "helm", weapon: "sword", offhand: "shield", armor: "plate", gloves: "gloves", belt: "belt", boots: "boots", amulet: "amulet", ring: "ring", rune: "rune", gem: "gem", jewel: "jewel", misc: "misc" };
 
   function key(it) {
     if (it.slot === "charm") return it.size === 1 ? "small" : it.size === 2 ? "large" : "grand";

@@ -62,6 +62,7 @@
   }
   function normalize(d) {
     d = d || {};
+    if (!Array.isArray(d.custom)) d.custom = []; // user-defined items not in the database
     if (!Array.isArray(d.chars)) d.chars = [];
     if (!Array.isArray(d.stash)) d.stash = [];
     if (!d.current && d.chars.length) d.current = d.chars[0].id;
@@ -76,7 +77,7 @@
     const snapshot = JSON.parse(JSON.stringify(state));
     saveChain = saveChain.then(async () => { await sealInto(acct, key, snapshot); writeAccounts(); }).catch(() => {});
   }
-  function lock() { session = null; state = null; pickedAcct = null; tab = "gear"; render(); }
+  function lock() { unregisterCustom(); session = null; state = null; pickedAcct = null; tab = "gear"; render(); }
 
   // ---------- old photo cleanup ----------
   // Photos used to be stored with items; they no longer are. Remove any left in
@@ -102,12 +103,38 @@
   }
 
 
+  // ---------- custom items (per account) ----------
+  // Stored as { name, slot, type, stats } and merged into the item catalog while unlocked.
+  let customLoaded = [];
+  function registerCustom() {
+    unregisterCustom();
+    for (const ci of state.custom || []) {
+      const it = { name: ci.name, slot: ci.slot, type: ci.type || "misc", stats: ci.stats || "", custom: true };
+      ITEMS.push(it); byName.set(it.name, it); SEARCH_INDEX.push(indexEntry(it)); customLoaded.push(it);
+    }
+  }
+  function unregisterCustom() {
+    for (const it of customLoaded) {
+      const i = ITEMS.indexOf(it); if (i >= 0) ITEMS.splice(i, 1);
+      if (byName.get(it.name) === it) byName.delete(it.name);
+      const j = SEARCH_INDEX.findIndex((e) => e.it === it); if (j >= 0) SEARCH_INDEX.splice(j, 1);
+    }
+    customLoaded = [];
+  }
+  // Drop custom definitions nothing refers to any more.
+  function pruneCustom() {
+    const used = new Set([...state.stash.map((e) => e.item), ...state.chars.flatMap((c) => [...Object.values(c.gear).map((g) => g?.item), ...c.charms.map((x) => x.item)])]);
+    const before = state.custom.length;
+    state.custom = state.custom.filter((ci) => used.has(ci.name));
+    if (state.custom.length !== before) registerCustom();
+  }
+
   // Characters saved by the earlier single-user version (plain, unencrypted).
   function legacyData() {
     try { const raw = localStorage.getItem(STORE_KEY); return raw ? normalize(JSON.parse(raw)) : null; } catch (e) { return null; }
   }
 
-  const SLOT_LABELS = { helm: "Helms", amulet: "Amulets", ring: "Rings", weapon: "Weapons", offhand: "Shields & off-hands", armor: "Armor", gloves: "Gloves", belt: "Belts", boots: "Boots", charm: "Charms" };
+  const SLOT_LABELS = { helm: "Helms", amulet: "Amulets", ring: "Rings", weapon: "Weapons", offhand: "Shields & off-hands", armor: "Armor", gloves: "Gloves", belt: "Belts", boots: "Boots", charm: "Charms", rune: "Runes", gem: "Gems", jewel: "Jewels & facets", misc: "Keys, organs & other" };
   const inStash = (name) => state.stash.some((s) => s.item === name);
   // Traderie search link; generic rare/crafted entries have no single listing.
   function traderieLink(it) {
@@ -289,7 +316,7 @@
       const btn = $("button", uf); btn.disabled = true; btn.textContent = "Unlocking…";
       try {
         const { key, data } = await openAcct(picked, $("#unlockPw").value);
-        session = { acct: picked, key }; state = normalize(data); purgePhotos(); render();
+        session = { acct: picked, key }; state = normalize(data); registerCustom(); purgePhotos(); render();
       } catch (err) {
         btn.disabled = false; btn.textContent = "Unlock";
         $("#unlockErr").textContent = "Wrong password.";
@@ -308,7 +335,7 @@
       const s = await createAccount(name, pw, data);
       if (!s) return;
       if (move) { try { localStorage.removeItem(STORE_KEY); } catch (err) { /* ignore */ } }
-      session = s; state = data; render();
+      session = s; state = data; registerCustom(); render();
     };
     $("#loginImport").onchange = (e) => importFile(e);
   }
@@ -411,7 +438,7 @@
     return `<span class="n-${it.type}">${esc(it.name)}</span>${it.runes ? ` <span class="runes">(${esc(it.runes)})</span>` : ""}`;
   }
 
-  const TYPE_LABEL = { unique: "Unique", set: "Set item", runeword: "Runeword", rare: "Rare / crafted", charm: "Charm" };
+  const TYPE_LABEL = { unique: "Unique", set: "Set item", runeword: "Runeword", rare: "Rare / crafted", magic: "Magic", charm: "Charm", rune: "Rune", gem: "Gem", jewel: "Jewel", misc: "Other" };
   // Split "a, b (x, y), c" into stat lines without breaking inside parentheses.
   const statLines = (s) => String(s || "").split(/,\s+(?![^()]*\))/).map((x) => x.trim()).filter(Boolean);
   const noteLines = (s) => String(s || "").split(/\n|\s·\s/).map((x) => x.trim()).filter(Boolean);
@@ -420,9 +447,10 @@
   const itemIcon = (it) => `<span class="item-ico n-${it.type}" aria-hidden="true">${ItemIcons.svg(it)}</span>`;
 
   // ---------- item search ----------
-  const SLOT_NAME = { helm: "Helm", armor: "Armor", weapon: "Weapon", offhand: "Shield / off-hand", gloves: "Gloves", belt: "Belt", boots: "Boots", amulet: "Amulet", ring: "Ring", charm: "Charm" };
+  const SLOT_NAME = { helm: "Helm", armor: "Armor", weapon: "Weapon", offhand: "Shield / off-hand", gloves: "Gloves", belt: "Belt", boots: "Boots", amulet: "Amulet", ring: "Ring", charm: "Charm", rune: "Rune", gem: "Gem", jewel: "Jewel", misc: "Other" };
   const sNorm = (s) => String(s || "").toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-  const SEARCH_INDEX = ITEMS.map((it) => ({ it, hay: sNorm([it.name, it.alias, it.runes, it.cls].filter(Boolean).join(" ")), name: sNorm(it.name) }));
+  const indexEntry = (it) => ({ it, hay: sNorm([it.name, it.alias, it.runes, it.cls].filter(Boolean).join(" ")), name: sNorm(it.name) });
+  const SEARCH_INDEX = ITEMS.map(indexEntry);
   // Rank: name starts with query > a word starts with it > contains it anywhere (incl. alias, runes).
   function searchItems(q, filter, limit = 8) {
     const n = sNorm(q);
@@ -465,7 +493,7 @@
     if (!it) return opts.empty ? `<div class="tip empty-tip">${opts.empty}</div>` : "";
     const mine = noteLines(entry.note);
     const typical = statLines(it.stats);
-    const sub = [TYPE_LABEL[it.type], it.req ? `lvl ${it.req}` : "", it.cls ? `${it.cls} only` : ""].filter(Boolean).join(" · ");
+    const sub = [it.custom ? "Custom" : "", TYPE_LABEL[it.type], SLOT_NAME[it.slot] && it.custom ? SLOT_NAME[it.slot] : "", it.req ? `lvl ${it.req}` : "", it.cls ? `${it.cls} only` : ""].filter(Boolean).join(" · ");
     return `<div class="tip" data-entry="${opts.noteKey || ""}">
       <div class="tip-top">
         ${itemIcon(it)}
@@ -475,8 +503,8 @@
           ${it.runes ? `<div class="tip-runes">'${esc(it.runes.replace(/ /g, ""))}'</div>` : ""}
         </div>
       </div>
-      <div class="tip-h">Typical stats</div><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
-      ${mine.length ? `<hr class="tip-divider"><div class="tip-h">Actual stats</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+      ${typical.length ? `<div class="tip-h">Typical stats</div><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+      ${mine.length ? `<hr class="tip-divider" ${typical.length ? "" : "hidden"}><div class="tip-h">Actual stats</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
       <div class="tip-actions">
         <label class="link">📷 Scan stats<input type="file" class="scan-in" accept="image/*" capture="environment" hidden></label>
         <label class="link">🖼 From gallery<input type="file" class="scan-in" accept="image/*" hidden></label>
@@ -642,7 +670,7 @@
 
   function renderStash(body, c) {
     const groups = Object.keys(SLOT_LABELS);
-    if (!GEAR_TYPES.some(([g]) => g === stashType)) stashType = "helm";
+    if (!STASH_TYPES.some(([g]) => g === stashType)) stashType = "helm";
     const ups = new Map(stashUpgrades(c).map((u) => [u.entry.id, u]));
     const sections = groups.map((g) => {
       const entries = state.stash.filter((e) => byName.get(e.item)?.slot === g);
@@ -671,11 +699,22 @@
         <div class="add-row">
           <div class="stack add-pick">
             ${searchHTML("Search any item…")}
-            <label class="field"><span>Gear type</span><select id="addStashType">${GEAR_TYPES.map(([g, l]) => `<option value="${g}" ${g === stashType ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+            <label class="field"><span>Gear type</span><select id="addStashType">${STASH_TYPES.map(([g, l]) => `<option value="${g}" ${g === stashType ? "selected" : ""}>${l}</option>`).join("")}</select></label>
             <label class="field"><span>Item</span><select id="addStash">${itemsOfType(c, stashType)}</select></label>
           </div>
           <button class="btn" id="addStashBtn">Add</button>
         </div>
+        <details class="custom-add">
+          <summary>Not in the list? Add a custom item</summary>
+          <div class="stack">
+            <label class="field"><span>Item name</span><input type="text" id="cuName" maxlength="60" placeholder="e.g. Hellfire Torch (Paladin), 15 IAS jewel, eth Thresher base"></label>
+            <label class="field"><span>Gear type</span><select id="cuSlot">${STASH_TYPES.map(([g, l]) => `<option value="${g}" ${g === stashType ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+            <label class="field"><span>Rarity</span><select id="cuType">${[["unique", "Unique"], ["set", "Set"], ["runeword", "Runeword"], ["rare", "Rare / crafted"], ["magic", "Magic"], ["misc", "Normal / other"]].map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
+            <label class="field"><span>Stats (optional, one per line)</span><textarea id="cuStats" rows="3"></textarea></label>
+            <p class="err" id="cuErr"></p>
+            <button class="btn" id="cuAdd" type="button">Add custom item to stash</button>
+          </div>
+        </details>
       </div>
       <div class="card" style="margin-top:12px">${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
     $("#addStashType").onchange = (ev) => { stashType = ev.target.value; $("#addStash").innerHTML = itemsOfType(c, stashType); };
@@ -687,9 +726,21 @@
       $("#addStashBtn").focus();
     });
     $("#addStashBtn").onclick = () => { state.stash.push({ id: uid(), item: $("#addStash").value, note: "" }); save(); render(); };
+    $("#cuAdd").onclick = () => {
+      let name = $("#cuName").value.trim().replace(/\s+/g, " ");
+      if (!name) { $("#cuErr").textContent = "Give the item a name."; return; }
+      const existing = byName.get(name);
+      if (existing && !existing.custom) { $("#cuErr").textContent = `"${name}" is already in the list — use the search box above.`; return; }
+      const slot = $("#cuSlot").value;
+      if (!existing) state.custom.push({ name, slot, type: $("#cuType").value, stats: "" });
+      registerCustom();
+      state.stash.push({ id: uid(), item: name, note: $("#cuStats").value.trim() });
+      stashType = slot;
+      save(); render();
+    };
     body.querySelectorAll(".charm-row").forEach((row) => {
       const e = state.stash.find((x) => x.id === row.dataset.id);
-      $(".rm", row).onclick = () => { state.stash = state.stash.filter((x) => x !== e); save(); render(); };
+      $(".rm", row).onclick = () => { state.stash = state.stash.filter((x) => x !== e); pruneCustom(); save(); render(); };
       const eq = $(".eq", row);
       if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
     });
@@ -900,6 +951,7 @@
   }
 
   const GEAR_TYPES = [["helm", "Helm"], ["armor", "Armor"], ["weapon", "Weapon"], ["offhand", "Shield / off-hand"], ["gloves", "Gloves"], ["belt", "Belt"], ["boots", "Boots"], ["amulet", "Amulet"], ["ring", "Ring"], ["charm", "Charm"]];
+  const STASH_TYPES = [...GEAR_TYPES, ["rune", "Rune"], ["gem", "Gem"], ["jewel", "Jewel / facet"], ["misc", "Key, organ, token & other"]];
   const TYPE_WORDS = [
     ["charm", /\b(small|large|grand) charm\b/], ["ring", /\bring\b/], ["amulet", /\bamulet\b/],
     ["helm", /\b(helm|cap|crown|mask|circlet|coronet|tiara|diadem|shako|pelt|hawk|antlers|totem|wolf head|spirit mask|demonhead|death mask|bone visage|sallet|casque|armet)\b/],
@@ -931,8 +983,10 @@
     }
     const recItems = mine.filter((i) => rec.has(i.name));
     let html = recItems.length ? `<optgroup label="Recommended for ${esc(b.name)}">${recItems.map(opt).join("")}</optgroup>` : "";
-    for (const [k, l] of [["unique", "Uniques"], ["set", "Set items"], ["runeword", "Runewords"], ["rare", "Rare / crafted / magic"], ["charm", "Charms"]]) {
-      const g = mine.filter((i) => i.type === k && !rec.has(i.name)).sort((x, y) => x.name.localeCompare(y.name));
+    const customs = mine.filter((i) => i.custom);
+    if (customs.length) html += `<optgroup label="Your custom items">${customs.map(opt).join("")}</optgroup>`;
+    for (const [k, l] of [["unique", "Uniques"], ["set", "Set items"], ["runeword", "Runewords"], ["rare", "Rare / crafted"], ["magic", "Magic"], ["charm", "Charms"], ["rune", "Runes"], ["gem", "Gems"], ["jewel", "Jewels"], ["misc", "Other"]]) {
+      const g = mine.filter((i) => i.type === k && !rec.has(i.name) && !i.custom).sort((x, y) => (k === "rune" ? 0 : x.name.localeCompare(y.name)));
       if (g.length) html += `<optgroup label="${l}">${g.map(opt).join("")}</optgroup>`;
     }
     if (others.length) html += `<optgroup label="Other classes">${others.map(opt).join("")}</optgroup>`;
@@ -943,7 +997,7 @@
     return new Promise((resolve) => {
       const d = $("#scanDialog");
       const url = URL.createObjectURL(file);
-      const typeOpts = GEAR_TYPES.map(([g, l]) => `<option value="${g}">${l}</option>`).join("");
+      const typeOpts = STASH_TYPES.map(([g, l]) => `<option value="${g}">${l}</option>`).join("");
       d.innerHTML = `<form method="dialog" class="stack">
         <h2>Photo ${idx + 1} of ${total}</h2>
         <img class="scan-thumb" src="${url}" alt="Your photo">
