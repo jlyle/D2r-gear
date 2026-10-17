@@ -2,7 +2,7 @@
 
 Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inventory, and get upgrade recommendations by build and budget (Starter / Mid / Endgame).
 
-**Live site:** https://jlyle.github.io/d2r-gear/
+**Live site:** https://jlyle.github.io/D2r-gear/
 
 ## Features
 - Roster of characters, saved in the browser (Export/Import backup to move between devices)
