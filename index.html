@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=202610171520">
+  <link rel="stylesheet" href="styles.css?v=202610171534">
 </head>
 <body class="locked">
   <header class="top">
@@ -36,6 +36,12 @@
   <main id="app"></main>
 
   <dialog id="scanDialog" class="scan-dialog"></dialog>
+  <dialog id="photoView" class="photo-view">
+    <form method="dialog">
+      <div class="pv-head"><h2>Photo</h2><button class="btn ghost small" value="close" aria-label="Close">✕</button></div>
+      <img alt="Item photo">
+    </form>
+  </dialog>
   <div id="scanStatus" class="toast" role="status" hidden></div>
 
   <dialog id="pwDialog">
@@ -57,7 +63,7 @@
     Fan-made tool, not affiliated with Blizzard Entertainment.
   </footer>
 
-  <script src="data.js?v=202610171520"></script>
-  <script src="app.js?v=202610171520"></script>
+  <script src="data.js?v=202610171534"></script>
+  <script src="app.js?v=202610171534"></script>
 </body>
 </html>

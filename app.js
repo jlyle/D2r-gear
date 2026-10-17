@@ -16,7 +16,11 @@
   const MAX_CHARS = 10;
   const PBKDF2_ITERS = 250000;
   const enc = new TextEncoder(), dec = new TextDecoder();
-  const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+  const b64 = (buf) => {
+    const u = new Uint8Array(buf); let s = "";
+    for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000));
+    return btoa(s);
+  };
   const unb64 = (s) => Uint8Array.from(atob(s), (ch) => ch.charCodeAt(0));
 
   let accounts = loadAccounts();
@@ -71,7 +75,72 @@
     const snapshot = JSON.parse(JSON.stringify(state));
     saveChain = saveChain.then(async () => { await sealInto(acct, key, snapshot); writeAccounts(); }).catch(() => {});
   }
-  function lock() { session = null; state = null; pickedAcct = null; tab = "gear"; render(); }
+  function lock() { session = null; state = null; pickedAcct = null; tab = "gear"; clearPhotoCache(); render(); }
+
+  // ---------- item photos (IndexedDB, encrypted with the account key) ----------
+  // Records: { key: "<acctId>:<photoId>", acct, iv, data: ArrayBuffer }. Entries keep only `photo: <photoId>`.
+  const DB_NAME = "gearLedger", PHOTO_STORE = "photos";
+  let dbPromise = null;
+  function db() {
+    if (!dbPromise) dbPromise = new Promise((res, rej) => {
+      const r = indexedDB.open(DB_NAME, 1);
+      r.onupgradeneeded = () => { const s = r.result.createObjectStore(PHOTO_STORE, { keyPath: "key" }); s.createIndex("acct", "acct"); };
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+    return dbPromise;
+  }
+  async function idb(mode, fn) {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const tx = d.transaction(PHOTO_STORE, mode);
+      const out = fn(tx.objectStore(PHOTO_STORE));
+      tx.oncomplete = () => res(out && "result" in out ? out.result : undefined);
+      tx.onerror = () => rej(tx.error);
+    });
+  }
+  const pkey = (acctId, id) => `${acctId}:${id}`;
+  const photoCache = new Map(); // photoId -> object URL (this session only)
+  function clearPhotoCache() { for (const u of photoCache.values()) URL.revokeObjectURL(u); photoCache.clear(); }
+
+  // Shrink to a readable size (tooltip text stays legible) and save encrypted.
+  async function storePhoto(file) {
+    const bmp = await createImageBitmap(file);
+    const scale = Math.min(1, 1400 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement("canvas");
+    cv.width = Math.round(bmp.width * scale); cv.height = Math.round(bmp.height * scale);
+    cv.getContext("2d").drawImage(bmp, 0, 0, cv.width, cv.height);
+    const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.8));
+    const bytes = await blob.arrayBuffer();
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const data = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, session.key, bytes);
+    const id = uid() + uid();
+    await idb("readwrite", (s) => s.put({ key: pkey(session.acct.id, id), acct: session.acct.id, iv: b64(iv), data }));
+    photoCache.set(id, URL.createObjectURL(blob));
+    return id;
+  }
+  async function photoURL(id) {
+    if (photoCache.has(id)) return photoCache.get(id);
+    const rec = await idb("readonly", (s) => s.get(pkey(session.acct.id, id)));
+    if (!rec) return null;
+    const bytes = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(rec.iv) }, session.key, rec.data);
+    const url = URL.createObjectURL(new Blob([bytes], { type: "image/jpeg" }));
+    photoCache.set(id, url);
+    return url;
+  }
+  function dropPhoto(id) {
+    if (!id || !session) return;
+    const u = photoCache.get(id);
+    if (u) { URL.revokeObjectURL(u); photoCache.delete(id); }
+    idb("readwrite", (s) => s.delete(pkey(session.acct.id, id))).catch(() => {});
+  }
+  const acctPhotos = (acctId) => idb("readonly", (s) => s.index("acct").getAll(acctId)).catch(() => []);
+  // Fill in <img data-photo-id> elements after a render.
+  function hydratePhotos(root) {
+    root.querySelectorAll("img[data-photo-id]").forEach(async (img) => {
+      try { const u = await photoURL(img.dataset.photoId); if (u) img.src = u; else img.closest(".ph")?.remove(); } catch (e) { img.closest(".ph")?.remove(); }
+    });
+  }
 
   // Characters saved by the earlier single-user version (plain, unencrypted).
   function legacyData() {
@@ -288,6 +357,10 @@
     const acct = { id: uid(), name, salt: rec.salt, iv: rec.iv, data: rec.data, created: Date.now() };
     accounts.push(acct);
     writeAccounts();
+    if (Array.isArray(rec.photos) && rec.photos.length) {
+      idb("readwrite", (s) => { rec.photos.forEach((p) => s.put({ key: pkey(acct.id, p.id), acct: acct.id, iv: p.iv, data: unb64(p.data).buffer })); })
+        .catch(() => alert("The account was added, but its photos couldn't be stored on this device."));
+    }
     return acct;
   }
 
@@ -380,6 +453,77 @@
     return `<span class="n-${it.type}">${esc(it.name)}</span>${it.runes ? ` <span class="runes">(${esc(it.runes)})</span>` : ""}`;
   }
 
+  const TYPE_LABEL = { unique: "Unique", set: "Set item", runeword: "Runeword", rare: "Rare / crafted", charm: "Charm" };
+  // Split "a, b (x, y), c" into stat lines without breaking inside parentheses.
+  const statLines = (s) => String(s || "").split(/,\s+(?![^()]*\))/).map((x) => x.trim()).filter(Boolean);
+  const noteLines = (s) => String(s || "").split(/\n|\s·\s/).map((x) => x.trim()).filter(Boolean);
+
+  // Tooltip-style item block with the photo, your rolls and typical stats.
+  // opts.noteKey marks the entry for wiring (see wireEntries).
+  function entryHTML(entry, it, opts = {}) {
+    if (!it) return opts.empty ? `<div class="tip empty-tip">${opts.empty}</div>` : "";
+    const mine = noteLines(entry.note);
+    const typical = statLines(it.stats);
+    const sub = [TYPE_LABEL[it.type], it.req ? `lvl ${it.req}` : "", it.cls ? `${it.cls} only` : ""].filter(Boolean).join(" · ");
+    return `<div class="tip" data-entry="${opts.noteKey || ""}">
+      <div class="tip-top">
+        ${entry.photo ? `<button class="ph" type="button" aria-label="View photo"><img data-photo-id="${esc(entry.photo)}" alt="Photo of ${esc(it.name)}"></button>` : ""}
+        <div class="tip-head">
+          <div class="tip-name n-${it.type}">${esc(it.name)}</div>
+          <div class="tip-sub">${esc(sub)}</div>
+          ${it.runes ? `<div class="tip-runes">'${esc(it.runes.replace(/ /g, ""))}'</div>` : ""}
+        </div>
+      </div>
+      ${mine.length ? `<div class="tip-h">Your item</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>
+        <details class="typ"><summary>Typical stats</summary><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul></details>`
+      : `<ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>`}
+      <div class="tip-actions">
+        <button class="link edit-note" type="button">✎ ${mine.length ? "Edit your rolls" : "Add your rolls"}</button>
+        <label class="link">📷 ${entry.photo ? "Change photo" : "Add photo"}<input type="file" class="ph-in" accept="image/*" hidden></label>
+        ${entry.photo ? `<button class="link rm-ph" type="button">Remove photo</button>` : ""}
+      </div>
+      <textarea class="note" rows="4" hidden placeholder="One stat per line, e.g. +35% Faster Cast Rate">${esc(mine.join("\n"))}</textarea>
+    </div>`;
+  }
+
+  // Hook up notes, photo buttons and the viewer for every .tip under root.
+  function wireEntries(root, lookup) {
+    root.querySelectorAll(".tip[data-entry]").forEach((tip) => {
+      const k = tip.dataset.entry;
+      if (!k) return;
+      const get = () => lookup(k);
+      const ta = $(".note", tip);
+      const editBtn = $(".edit-note", tip);
+      if (editBtn) editBtn.onclick = () => { ta.hidden = !ta.hidden; if (!ta.hidden) ta.focus(); };
+      if (ta) {
+        ta.oninput = () => { const en = get(); if (en) { en.note = ta.value; save(); } };
+        ta.onblur = () => render();
+      }
+      const ph = $(".ph", tip);
+      if (ph) ph.onclick = () => viewPhoto(get()?.photo, $(".tip-name", tip)?.textContent);
+      const inp = $(".ph-in", tip);
+      if (inp) inp.onchange = async () => {
+        const f = inp.files[0]; if (!f) return;
+        const en = get(); if (!en) return;
+        try { const id = await storePhoto(f); dropPhoto(en.photo); en.photo = id; save(); render(); }
+        catch (err) { alert("Couldn't save that photo on this device (storage may be full or blocked)."); }
+      };
+      const rm = $(".rm-ph", tip);
+      if (rm) rm.onclick = () => { const en = get(); if (!en) return; dropPhoto(en.photo); delete en.photo; save(); render(); };
+    });
+    hydratePhotos(root);
+  }
+
+  async function viewPhoto(id, title) {
+    if (!id) return;
+    const d = $("#photoView");
+    const url = await photoURL(id);
+    if (!url) return;
+    $("img", d).src = url;
+    $("h2", d).textContent = title || "Photo";
+    d.showModal();
+  }
+
   function renderSlots(body, c, slots) {
     body.innerHTML = `<div class="grid">${slots.map((s) => {
       const g = c.gear[s.key] || {};
@@ -387,19 +531,20 @@
       return `<div class="card slot" data-slot="${s.key}">
         <h3><span>${s.label}</span>${tierBadge(c, s.key, g.item)}</h3>
         <select class="pick" aria-label="${s.label}">${itemOptions(c, s, g.item)}</select>
-        <div class="stats">${it ? `${it.runes ? `<span class="runes">${esc(it.runes)} · </span>` : ""}${esc(it.stats)}` : ""}</div>
-        <input type="text" class="note" placeholder="Notes: sockets, rolls, base…" value="${esc(g.note)}">
+        ${entryHTML(g, it, { noteKey: s.key })}
       </div>`;
     }).join("")}</div>`;
     body.querySelectorAll(".slot").forEach((el) => {
       const key = el.dataset.slot;
       $(".pick", el).onchange = (e) => {
-        c.gear[key] = { ...(c.gear[key] || {}), item: e.target.value };
-        if (!e.target.value) delete c.gear[key].item;
+        const old = c.gear[key] || {};
+        // A different item: its old photo and rolls no longer apply.
+        if (old.item !== e.target.value) dropPhoto(old.photo);
+        c.gear[key] = e.target.value ? { item: e.target.value, note: "" } : {};
         save(); render();
       };
-      $(".note", el).oninput = (e) => { c.gear[key] = { ...(c.gear[key] || {}), note: e.target.value }; save(); };
     });
+    wireEntries(body, (k) => c.gear[k]);
   }
 
   function renderCharms(body, c) {
@@ -422,11 +567,8 @@
         <div id="charmList">${c.charms.length ? c.charms.map((ch) => {
           const it = byName.get(ch.item);
           return `<div class="charm-row" data-id="${ch.id}">
-            <div>${itemLine(it)} <span class="runes">${it ? `${it.size}×1` : ""}</span>
-              <div class="stats" style="font-size:13px;color:var(--muted)">${esc(it?.stats)}</div>
-              <input type="text" class="note" placeholder="Rolls: e.g. +1 Cold Skills, 45 life" value="${esc(ch.note)}">
-            </div>
-            <button class="btn ghost small rm" aria-label="Remove">✕</button>
+            ${entryHTML(ch, it, { noteKey: ch.id })}
+            <div class="row-btns"><span class="runes">${it ? `${it.size} cell${it.size > 1 ? "s" : ""}` : ""}</span><button class="btn ghost small rm" aria-label="Remove">✕</button></div>
           </div>`;
         }).join("") : `<p class="notes">No charms yet.</p>`}</div>
         <div class="add-row">
@@ -437,9 +579,9 @@
     $("#addCharmBtn").onclick = () => { c.charms.push({ id: uid(), item: $("#addCharm").value, note: "" }); save(); render(); };
     body.querySelectorAll(".charm-row").forEach((row) => {
       const ch = c.charms.find((x) => x.id === row.dataset.id);
-      $(".note", row).oninput = (e) => { ch.note = e.target.value; save(); };
-      $(".rm", row).onclick = () => { c.charms = c.charms.filter((x) => x !== ch); save(); render(); };
+      $(".rm", row).onclick = () => { dropPhoto(ch.photo); c.charms = c.charms.filter((x) => x !== ch); save(); render(); };
     });
+    wireEntries(body, (k) => c.charms.find((x) => x.id === k));
   }
 
   // Slots on this character (and merc) a given item could go into.
@@ -484,11 +626,12 @@
     if (!it) return;
     state.stash = state.stash.filter((x) => x !== entry);
     if (it.slot === "charm") {
-      c.charms.push({ id: uid(), item: it.name, note: entry.note || "" });
+      c.charms.push({ id: uid(), item: it.name, note: entry.note || "", photo: entry.photo });
     } else {
       const old = c.gear[slotKey];
-      if (old?.item) state.stash.push({ id: uid(), item: old.item, note: old.note || "" });
-      c.gear[slotKey] = { item: it.name, note: entry.note || "" };
+      if (old?.item) state.stash.push({ id: uid(), item: old.item, note: old.note || "", photo: old.photo });
+      else dropPhoto(old?.photo);
+      c.gear[slotKey] = { item: it.name, note: entry.note || "", photo: entry.photo };
     }
     save(); render();
   }
@@ -509,10 +652,9 @@
         const target = u ? u.slotKey : slotsFor(c, it)[0]?.key;
         const canEquip = it.slot === "charm" || target;
         return `<div class="charm-row" data-id="${e.id}">
-          <div>${itemLine(it)}${it.cls ? ` <span class="runes">${it.cls}</span>` : ""}
-            ${u ? `<div class="ok" style="font-size:13px">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
-            <div class="stats" style="font-size:13px;color:var(--muted)">${esc(it.stats)}</div>
-            <input type="text" class="note" placeholder="Rolls, sockets, ethereal…" value="${esc(e.note)}">
+          <div>
+            ${u ? `<div class="ok up-flag">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
+            ${entryHTML(e, it, { noteKey: e.id })}
           </div>
           <div class="row-btns">
             ${canEquip ? `<button class="btn small eq" data-slot="${target || ""}">Equip</button>` : ""}
@@ -534,11 +676,11 @@
     $("#addStashBtn").onclick = () => { state.stash.push({ id: uid(), item: $("#addStash").value, note: "" }); save(); render(); };
     body.querySelectorAll(".charm-row").forEach((row) => {
       const e = state.stash.find((x) => x.id === row.dataset.id);
-      $(".note", row).oninput = (ev) => { e.note = ev.target.value; save(); };
-      $(".rm", row).onclick = () => { state.stash = state.stash.filter((x) => x !== e); save(); render(); };
+      $(".rm", row).onclick = () => { dropPhoto(e.photo); state.stash = state.stash.filter((x) => x !== e); save(); render(); };
       const eq = $(".eq", row);
       if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
     });
+    wireEntries(body, (k) => state.stash.find((x) => x.id === k));
   }
 
   function renderUpgrades(body, c) {
@@ -725,7 +867,7 @@
     let nameIdx = lines.findIndex((l) => names.some((n) => sim(norm(l), n) >= 0.75));
     const start = nameIdx >= 0 ? nameIdx + 2 : Math.min(2, Math.max(0, lines.length - 3)); // name + base type
     return lines.slice(start).filter((l) => !skip.test(l) && !runeLine.test(l.replace(/\s/g, "")))
-      .slice(0, 12).join(" · ").slice(0, 300);
+      .slice(0, 14).join("\n").slice(0, 500);
   }
 
   function destinations(c, it) {
@@ -762,7 +904,8 @@
         <label class="field" id="otherWrap" ${cands.length ? "hidden" : ""}><span>Item</span><select id="scanOther">${allOpts}</select></label>
         <label class="field"><span>Put it in</span><select id="scanDest"></select></label>
         <label class="check" id="moveWrap"><input type="checkbox" id="scanMove" checked> Move the replaced item to the shared stash</label>
-        <label class="field"><span>Notes (stats read from the photo — edit as needed)</span><textarea id="scanNote" rows="4"></textarea></label>
+        <label class="check"><input type="checkbox" id="scanKeep" checked> Keep this photo with the item</label>
+        <label class="field"><span>Your rolls (read from the photo — one per line, edit as needed)</span><textarea id="scanNote" rows="6"></textarea></label>
         <details class="raw"><summary>Text read from photo</summary><pre>${esc(text.trim()) || "(nothing)"}</pre></details>
         <div class="row-btns end">
           <button class="btn ghost" value="skip" formnovalidate>Skip</button>
@@ -796,21 +939,25 @@
         const action = e.submitter?.value || "ok";
         d.close(); URL.revokeObjectURL(url);
         if (action !== "ok") return resolve(action);
-        resolve({ item: chosen(), dest: $("#scanDest").value, note: $("#scanNote").value.trim(), move: $("#scanMove").checked });
+        resolve({ item: chosen(), dest: $("#scanDest").value, note: $("#scanNote").value.trim(), move: $("#scanMove").checked, keepPhoto: $("#scanKeep").checked });
       };
       d.oncancel = () => { URL.revokeObjectURL(url); resolve("stop"); };
     });
   }
 
-  function applyScan(c, r) {
+  async function applyScan(c, r, file) {
     const it = r.item;
     if (!it) return;
-    if (r.dest === "stash") state.stash.push({ id: uid(), item: it.name, note: r.note });
-    else if (r.dest === "charms") c.charms.push({ id: uid(), item: it.name, note: r.note });
+    let photo;
+    if (r.keepPhoto) { try { photo = await storePhoto(file); } catch (err) { alert("Saved the item, but couldn't store the photo on this device."); } }
+    const entry = { item: it.name, note: r.note, ...(photo ? { photo } : {}) };
+    if (r.dest === "stash") state.stash.push({ id: uid(), ...entry });
+    else if (r.dest === "charms") c.charms.push({ id: uid(), ...entry });
     else {
       const old = c.gear[r.dest];
-      if (old?.item && r.move) state.stash.push({ id: uid(), item: old.item, note: old.note || "" });
-      c.gear[r.dest] = { item: it.name, note: r.note };
+      if (old?.item && r.move) state.stash.push({ id: uid(), item: old.item, note: old.note || "", photo: old.photo });
+      else dropPhoto(old?.photo);
+      c.gear[r.dest] = entry;
     }
     save();
   }
@@ -829,7 +976,7 @@
         status.hidden = true;
         const res = await reviewDialog(c, files[i], data.text || "", matchItems(data.text || ""), i, files.length);
         if (res === "stop") break;
-        if (res !== "skip") { applyScan(c, res); added++; render(); }
+        if (res !== "skip") { await applyScan(c, res, files[i]); added++; render(); }
       }
     } catch (err) {
       alert("Couldn't read photos — the text reader needs an internet connection the first time it loads.");
@@ -844,6 +991,8 @@
   $("#deleteChar").onclick = () => {
     const c = cur();
     if (!c || !confirm(`Delete ${c.name}? This can't be undone.`)) return;
+    Object.values(c.gear).forEach((g) => dropPhoto(g?.photo));
+    c.charms.forEach((ch) => dropPhoto(ch.photo));
     state.chars = state.chars.filter((x) => x !== c);
     state.current = state.chars[0]?.id || null;
     save(); render();
@@ -854,7 +1003,9 @@
     $(".menu").open = false;
     await saveChain;
     const { name, salt, iv, data } = session.acct;
-    const blob = new Blob([JSON.stringify({ format: "gear-ledger-account", v: 2, name, salt, iv, data }, null, 2)], { type: "application/json" });
+    const recs = await acctPhotos(session.acct.id);
+    const photos = recs.map((r) => ({ id: r.key.slice(r.key.indexOf(":") + 1), iv: r.iv, data: b64(r.data) }));
+    const blob = new Blob([JSON.stringify({ format: "gear-ledger-account", v: 3, name, salt, iv, data, photos })], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `gear-ledger-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
@@ -870,6 +1021,15 @@
     await saveChain;
     const salt = crypto.getRandomValues(new Uint8Array(16));
     const key = await deriveKey(pw, salt);
+    // Re-encrypt this account's photos with the new key first.
+    const recs = await acctPhotos(session.acct.id);
+    const redone = [];
+    for (const r of recs) {
+      const bytes = await crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(r.iv) }, session.key, r.data);
+      const iv = crypto.getRandomValues(new Uint8Array(12));
+      redone.push({ ...r, iv: b64(iv), data: await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, bytes) });
+    }
+    if (redone.length) await idb("readwrite", (s) => { redone.forEach((r) => s.put(r)); });
     session.acct.salt = b64(salt);
     await sealInto(session.acct, key, state);
     session.key = key;
@@ -884,6 +1044,8 @@
     await saveChain;
     accounts = accounts.filter((x) => x.id !== a.id);
     writeAccounts();
+    const recs = await acctPhotos(a.id);
+    if (recs.length) await idb("readwrite", (s) => { recs.forEach((r) => s.delete(r.key)); }).catch(() => {});
     lock();
   };
 
