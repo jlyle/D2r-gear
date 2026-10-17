@@ -415,20 +415,8 @@
   const statLines = (s) => String(s || "").split(/,\s+(?![^()]*\))/).map((x) => x.trim()).filter(Boolean);
   const noteLines = (s) => String(s || "").split(/\n|\s·\s/).map((x) => x.trim()).filter(Boolean);
 
-  // Original line icons per gear type (drawn for this site), tinted by item rarity.
-  const ICON_PATHS = {
-    helm: '<path d="M8 30c0-10 7-18 16-18s16 8 16 18v6H8z"/><path d="M8 36h32M24 12v24M16 24h16"/>',
-    armor: '<path d="M16 8l8 5 8-5 8 7-4 7v18H12V22l-4-7z"/><path d="M24 13v27M18 26h12"/>',
-    weapon: '<path d="M33 8l7 0 0 7-18 18-7-7z"/><path d="M13 27l8 8M10 38l6-6M12 30l6 6"/>',
-    offhand: '<path d="M24 7l15 5v11c0 9-7 15-15 19-8-4-15-10-15-19V12z"/><path d="M24 12v25M14 22h20"/>',
-    gloves: '<path d="M14 40V22l3-11 3 0 1 9 2-12 3 0 1 12 2-10 3 0 0 12 3-6 3 1-4 14v9z"/><path d="M14 34h18"/>',
-    belt: '<rect x="6" y="18" width="36" height="12" rx="2"/><rect x="19" y="16" width="10" height="16" rx="1"/><path d="M24 20v8"/>',
-    boots: '<path d="M14 8h11v20l12 5c3 1 4 3 4 6v3H10V30z"/><path d="M14 16h11M10 36h31"/>',
-    amulet: '<path d="M10 8c0 12 6 18 14 22 8-4 14-10 14-22"/><path d="M24 30l7 8-7 6-7-6z"/>',
-    ring: '<circle cx="24" cy="28" r="12"/><circle cx="24" cy="28" r="7"/><path d="M19 15l5-7 5 7z"/>',
-    charm: '<rect x="13" y="10" width="22" height="30" rx="3"/><path d="M24 16l6 9-6 9-6-9z"/>',
-  };
-  const itemIcon = (it) => `<span class="item-ico n-${it.type}" aria-hidden="true"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">${ICON_PATHS[it.slot] || ICON_PATHS.charm}</svg></span>`;
+  // Original line icons per item class (icons.js), tinted by item rarity.
+  const itemIcon = (it) => `<span class="item-ico n-${it.type}" aria-hidden="true">${ItemIcons.svg(it)}</span>`;
 
   // Tooltip-style item block: icon, typical stats, then your item's actual stats.
   // opts.noteKey marks the entry for wiring (see wireEntries).
