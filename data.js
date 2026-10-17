@@ -6,7 +6,7 @@
 // cls: class restriction · merc: usable by Act 2 mercenary as weapon
 // size: inventory cells for charms
 
-const CLASSES = ["Amazon", "Assassin", "Barbarian", "Druid", "Necromancer", "Paladin", "Sorceress"];
+const CLASSES = ["Amazon", "Assassin", "Barbarian", "Druid", "Necromancer", "Paladin", "Sorceress", "Warlock"];
 
 const ITEMS = [
   // ---------- HELMS ----------
@@ -159,6 +159,54 @@ const ITEMS = [
   { name: "Shadow Dancer", type: "unique", slot: "boots", cls: "Assassin", req: 71, stats: "+1-2 Shadow Disciplines, 30% FRW, 30% FHR, +15-25 dex" },
   { name: "Rare tri-res boots", type: "rare", slot: "boots", req: 1, stats: "FRW, FHR, triple resist, dex (note your rolls)" },
 
+  // ---------- ADDED FOR ALL-CLASS BUILDS ----------
+  // Weapons
+  { name: "Mosaic", type: "runeword", slot: "weapon", cls: "Assassin", req: 53, runes: "Mal Gul Amn", stats: "Claw: +2 Martial Arts, 20% IAS, finishers often keep charges (Non-Ladder in 3.3)" },
+  { name: "Chaos", type: "runeword", slot: "weapon", cls: "Assassin", req: 57, runes: "Fal Ohm Um", stats: "Claw: +1 Whirlwind, 35% IAS, +240-290% ED, Frozen Orb & Charged Bolt procs" },
+  { name: "Warshrike", type: "unique", slot: "weapon", req: 75, stats: "Throwing knife: Nova on striking, piercing attack, deadly strike" },
+  { name: "Gimmershred", type: "unique", slot: "weapon", req: 70, stats: "Throwing axe: 60% IAS, fire/cold/light damage" },
+  { name: "Ondal's Wisdom", type: "unique", slot: "weapon", req: 66, fcr: 45, stats: "Staff: +2-4 all skills, 45% FCR, +40-50 energy, magic damage reduced" },
+  { name: "Death's Web", type: "unique", slot: "weapon", cls: "Necromancer", req: 66, stats: "Wand: +2 all skills, -40-50% enemy poison res, +1-2 Poison & Bone" },
+  { name: "Mang Song's Lesson", type: "unique", slot: "weapon", req: 82, fcr: 30, stats: "Staff: +5 all skills, 30% FCR, -7-15% enemy cold/fire/light res" },
+  { name: "Obsession", type: "runeword", slot: "weapon", req: 69, fcr: 65, runes: "Zod Ist Lem Lum Io Nef", stats: "Staff: +4 all skills, 65% FCR, 60% FHR, +15-25 all res" },
+  { name: "Arioc's Needle", type: "unique", slot: "weapon", merc: true, req: 81, stats: "Spear: +2-4 all skills, 30% IAS, 50% deadly strike, ignore target def" },
+  { name: "Dreadfang", type: "unique", slot: "weapon", req: 61, stats: "Legend Sword: +3 Mirrored Blades (Warlock), 33% IAS, 33% deadly strike, Amp Damage proc" },
+  { name: "Bloodpact Shard", type: "unique", slot: "weapon", req: 67, fcr: 30, stats: "Dagger: +1 all skills, 30% FCR, +1-3 Bind Demon, +2-3 Blood Boil & Blood Oath, +10-15% max life" },
+  { name: "Void", type: "runeword", slot: "weapon", runes: "Thul Zod Ist", stats: "Dagger: indestructible, FCR, magic skill damage, Abyss oskill" },
+  { name: "Ritual", type: "runeword", slot: "weapon", runes: "Amn Shael Ohm", stats: "Dagger: AR, life leech, damage vs demons (melee)" },
+  { name: "Rare Warlock dagger", type: "rare", slot: "weapon", cls: "Warlock", req: 1, stats: "Vendor dagger: +1-3 to up to three Warlock skills (e.g. +3 Abyss/Miasma Chain)" },
+  { name: "Rare/Crafted bow", type: "rare", slot: "weapon", cls: "Amazon", req: 1, stats: "+2-3 Bow & Crossbow skills, IAS, ED" },
+  { name: "Fortitude (weapon)", type: "runeword", slot: "weapon", merc: true, req: 59, runes: "El Sol Dol Lo", stats: "+300% ED, 25% FCR, life per level, +25-30 all res, Chilling Armor proc" },
+  // Off-hands
+  { name: "Ars Dul'Mephistos", type: "unique", slot: "offhand", cls: "Warlock", req: 78, fcr: 20, stats: "Grimoire: +2 Warlock skills, 20-30% FCR, 30% FHR, -10-20% enemy magic res" },
+  { name: "Ars Al'Diabolos", type: "unique", slot: "offhand", cls: "Warlock", req: 80, fcr: 25, stats: "Grimoire: +2 Chaos skills, 25% FCR, +15-25% fire skill damage, +3-5 Apocalypse" },
+  { name: "Ars Tor'Baalos", type: "unique", slot: "offhand", cls: "Warlock", req: 73, stats: "Grimoire: +2 Demon skills, +2-4 Blood Boil, +2-3 Consume/Engorge/Demonic Mastery, life per level" },
+  { name: "Measured Wrath", type: "unique", slot: "offhand", cls: "Warlock", req: 52, fcr: 25, stats: "Grimoire: +1 Warlock skills, 25% FCR, +1-3 Flame Wave/Ring of Fire/Summon Tainted" },
+  { name: "Horazon's Secrets", type: "set", slot: "offhand", cls: "Warlock", stats: "Codex: +2 Eldritch skills, 30% FHR, +20% block, +30-50 life" },
+  { name: "Rare necro head", type: "rare", slot: "offhand", cls: "Necromancer", req: 1, stats: "+2-3 to a Necro tree, +3 to a skill (e.g. Bone Spear / Poison Nova), res" },
+  // Helms
+  { name: "Hellwarden's Will", type: "unique", slot: "helm", req: 50, fcr: 20, stats: "+1 all skills, 20% IAS, 20% FCR, -5-8% enemy magic & fire res" },
+  { name: "Coven", type: "runeword", slot: "helm", runes: "Ist Ral Io", stats: "+skills, FCR, fire res, magic find" },
+  { name: "Horazon's Countenance", type: "set", slot: "helm", cls: "Warlock", stats: "+1 Warlock skills, 99% AR, +10-20 str, magic damage reduced" },
+  { name: "Rare Warcries helm", type: "rare", slot: "helm", cls: "Barbarian", req: 1, stats: "+2-3 Warcries, +3 Battle Orders/War Cry, sockets" },
+  { name: "Rare Shape Shifting pelt", type: "rare", slot: "helm", cls: "Druid", req: 1, stats: "+2-3 Shape Shifting, +3 Werewolf/Werebear/Fury" },
+  // Armor
+  { name: "Authority", type: "runeword", slot: "armor", runes: "Hel Shael Ral", stats: "Caster body armor: +skills, utility mods" },
+  { name: "Horazon's Dominion", type: "set", slot: "armor", cls: "Warlock", stats: "+2 Demon skills, +75-100 mana, +15-25 cold/light/fire res" },
+  // Gloves
+  { name: "Horazon's Hold", type: "set", slot: "gloves", cls: "Warlock", stats: "+140-270 fire damage, 10% CB, +30-40 life" },
+  { name: "Rare bow gloves", type: "rare", slot: "gloves", cls: "Amazon", req: 1, stats: "+2-3 Bow & Crossbow, 20% IAS, res/stats" },
+  // Belts
+  { name: "Gheed's Wager", type: "unique", slot: "belt", req: 71, fcr: 10, stats: "10-20% FCR, 10-20% FHR, 10-20% FRW, -3-7% enemy magic res" },
+  // Boots
+  { name: "Wraithstep", type: "unique", slot: "boots", req: 67, stats: "30% FRW, 20% FHR, +10-15 dex & energy (can roll +Warlock skill)" },
+  { name: "Horazon's Legacy", type: "set", slot: "boots", cls: "Warlock", stats: "30% FRW, +10-15 str/dex, cannot be frozen, 20-30% magic res" },
+  // Rings & amulets
+  { name: "Sling", type: "unique", slot: "ring", req: 50, fcr: 10, stats: "10% FCR, -3-5% enemy magic res, +10-15 energy, slows target" },
+  { name: "Opalvein", type: "unique", slot: "ring", req: 50, fcr: 10, stats: "10% FCR, fire res, life & mana per kill, Flame Wave proc" },
+  { name: "Entropy Locket", type: "unique", slot: "amulet", req: 54, fcr: 5, stats: "5-10% FCR, +5-10% magic skill damage, +10-15% max mana, Miasma Chain proc" },
+  { name: "Rare +3 skill-tree amulet", type: "rare", slot: "amulet", req: 1, stats: "Magic/rare: +3 to one class skill tree, plus FCR or res" },
+
   // ---------- CHARMS ----------
   { name: "Annihilus", type: "charm", slot: "charm", size: 1, unique1: true, req: 70, stats: "Small: +1 all skills, +10-20 all attributes, +10-20 all res, +5-10% XP" },
   { name: "Hellfire Torch", type: "charm", slot: "charm", size: 2, unique1: true, req: 75, stats: "Large: +3 to one class's skills, +10-20 all attributes, +10-20 all res" },
@@ -186,6 +234,7 @@ const FCR_BREAKPOINTS = {
   Necromancer: [0, 9, 18, 30, 48, 75, 125],
   Paladin:     [0, 9, 18, 30, 48, 75, 125],
   Sorceress:   [0, 9, 20, 37, 63, 105, 200],
+  Warlock:     [0, 9, 18, 30, 48, 75, 125], // community-reported (matches Necromancer)
 };
 
 // Slot layout. listSlot = which item list a slot draws from.
@@ -240,119 +289,381 @@ const MELEE_COMMON = {
   merc_armor: [["Smoke"], ["Treachery", "Duress"], ["Fortitude", "Chains of Honor"]],
 };
 
+// Top 5 builds per class for Season 15 / Patch 3.3 (Reign of the Warlock).
+// Each build inherits a base template; `slots` overrides it. A slot set to null
+// isn't used by that build (e.g. off-hand with a two-handed bow).
+const T = (starter, mid, end) => [starter, mid, end];
+const CASTER_SKILLS = ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — FHR"];
+const MELEE_CHARMS = ["Annihilus", "Hellfire Torch", "Grand charm (other)", "Small charm — life/res"];
+const BOW_SLOTS = {
+  weapon: T(["Rare/Crafted bow"], ["Buriza-Do Kyanon", "Rare/Crafted bow"], ["Windforce", "Faith"]),
+  offhand: null,
+  helm: T(["Tarnhelm", "Peasant Crown"], ["Vampire Gaze", "Harlequin Crest"], ["Harlequin Crest", "Andariel's Visage"]),
+  armor: T(["Stealth", "Smoke"], ["Treachery", "Shaftstop"], ["Enigma", "Fortitude"]),
+  gloves: T(["Bloodfist", "Rare bow gloves"], ["Rare bow gloves"], ["Rare bow gloves"]),
+  belt: T(["Rare/Crafted belt"], ["Nosferatu's Coil", "Razortail"], ["Nosferatu's Coil", "Razortail"]),
+  boots: T(["Treads of Cthon"], ["War Traveler", "Waterwalk"], ["Sandstorm Trek", "War Traveler"]),
+  amulet: T(["The Eye of Etlich"], ["Cat's Eye"], ["Highlord's Wrath", "Cat's Eye"]),
+};
+
 const BUILDS = [
-  {
-    id: "blizz-sorc", name: "Blizzard Sorceress", cls: "Sorceress", caster: true, fcrTarget: 105,
-    base: CASTER_COMMON,
+  // ===== AMAZON =====
+  { id: "javazon", name: "Lightning Fury Javazon", cls: "Amazon", caster: false, base: MELEE_COMMON,
     slots: {
-      helm: [["Lore", "Tarnhelm"], ["Harlequin Crest"], ["Harlequin Crest", "Nightwing's Veil"]],
-      amulet: [["Nokozan Relic", "The Eye of Etlich"], ["Tal Rasha's Adjudication", "2/20 caster amulet"], ["Mara's Kaleidoscope", "Tal Rasha's Adjudication"]],
-      weapon: [["Spirit (sword)", "Magic caster weapon"], ["The Oculus", "Heart of the Oak", "Memory"], ["Death's Fathom", "Heart of the Oak"]],
-    },
-    charms: ["Cold Rupture", "Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — FHR"],
-    notes: "Aim for 105% FCR (63% is the cheaper step). Cold Mastery + sunder handles cold immunes; Infinity merc helps too.",
-  },
-  {
-    id: "light-sorc", name: "Lightning Sorceress", cls: "Sorceress", caster: true, fcrTarget: 105,
-    base: CASTER_COMMON,
-    slots: {
-      helm: [["Lore", "Tarnhelm"], ["Harlequin Crest"], ["Griffon's Eye", "Harlequin Crest"]],
-      amulet: [["Nokozan Relic", "The Eye of Etlich"], ["Tal Rasha's Adjudication", "2/20 caster amulet"], ["Mara's Kaleidoscope", "Tal Rasha's Adjudication"]],
-      weapon: [["Spirit (sword)", "Magic caster weapon"], ["The Oculus", "Heart of the Oak", "Memory"], ["Eschuta's Temper", "Heart of the Oak"]],
-    },
-    charms: ["Crack of the Heavens", "Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — FHR"],
-    notes: "Lightning immunes are the problem: Infinity merc + Crack of the Heavens + Griffon's. 105% FCR target.",
-  },
-  {
-    id: "hammerdin", name: "Hammerdin (Blessed Hammer)", cls: "Paladin", caster: true, fcrTarget: 125,
-    base: CASTER_COMMON,
-    slots: {
-      offhand: [["Ancient's Pledge"], ["Spirit (shield)", "Herald of Zakarum"], ["Herald of Zakarum", "Spirit (shield)"]],
-      amulet: [["Nokozan Relic", "The Eye of Etlich"], ["2/20 caster amulet", "Saracen's Chance"], ["Mara's Kaleidoscope", "Seraph's Hymn"]],
-      merc_weapon: [["Insight"], ["Insight"], ["Insight", "Infinity"]],
-    },
-    charms: ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — FHR"],
-    notes: "Hammers are magic damage — no sunder needed. 75% FCR is fine, 125% is the endgame breakpoint.",
-  },
-  {
-    id: "smiter", name: "Smiter (Uber killer)", cls: "Paladin", caster: false,
-    base: MELEE_COMMON,
-    slots: {
-      weapon: [["Steel", "Lawbringer"], ["Kingslayer", "Grief"], ["Grief"]],
-      offhand: [["Ancient's Pledge", "Rhyme"], ["Herald of Zakarum", "Spirit (shield)"], ["Herald of Zakarum", "Exile"]],
-      helm: [["Rockstopper", "Guillaume's Face"], ["Guillaume's Face", "Vampire Gaze"], ["Guillaume's Face", "Crown of Ages", "Andariel's Visage"]],
-      gloves: [["Bloodfist"], ["Laying of Hands"], ["Dracul's Grasp", "Laying of Hands"]],
-    },
-    charms: ["Annihilus", "Hellfire Torch", "Grand charm (other)", "Small charm — life/res"],
-    notes: "Crushing blow + life tap + high block. Max resists matter more than raw damage for Ubers.",
-  },
-  {
-    id: "ww-barb", name: "Whirlwind Barbarian", cls: "Barbarian", caster: false,
-    base: MELEE_COMMON,
-    slots: {
-      helm: [["Rockstopper", "Guillaume's Face"], ["Arreat's Face"], ["Arreat's Face", "Andariel's Visage"]],
-      offhand: [["Steel", "Ancient's Pledge"], ["Grief", "Kingslayer"], ["Grief", "Breath of the Dying"]],
-      weapon: [["Steel"], ["Grief", "Death Cleaver"], ["Grief", "Breath of the Dying"]],
-    },
-    charms: ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Grand charm (other)", "Small charm — life/res"],
-    notes: "Dual-wield two weapons (off-hand slot = second weapon). Call to Arms in swap for Battle Orders.",
-  },
-  {
-    id: "javazon", name: "Lightning Fury Javazon", cls: "Amazon", caster: false,
-    base: MELEE_COMMON,
-    slots: {
-      weapon: [["Titan's Revenge"], ["Titan's Revenge"], ["Thunderstroke", "Titan's Revenge"]],
-      offhand: [["Ancient's Pledge"], ["Spirit (shield)", "Rhyme"], ["Spirit (shield)", "Stormshield"]],
-      helm: [["Lore", "Peasant Crown"], ["Harlequin Crest", "Vampire Gaze"], ["Griffon's Eye", "Harlequin Crest", "Andariel's Visage"]],
-      armor: [["Stealth", "Smoke"], ["Treachery", "Skin of the Vipermagi"], ["Enigma", "Chains of Honor"]],
-      gloves: [["Bloodfist", "Rare javelin gloves"], ["Rare javelin gloves"], ["Rare javelin gloves"]],
-      belt: [["Rare/Crafted belt"], ["Thundergod's Vigor"], ["Thundergod's Vigor"]],
-      boots: [["Treads of Cthon"], ["War Traveler", "Waterwalk"], ["Sandstorm Trek", "Rare tri-res boots", "War Traveler"]],
-      amulet: [["The Eye of Etlich"], ["Cat's Eye", "Saracen's Chance"], ["Highlord's Wrath", "Mara's Kaleidoscope"]],
-      merc_weapon: [["Insight"], ["Insight"], ["Infinity"]],
+      weapon: T(["Titan's Revenge"], ["Titan's Revenge"], ["Thunderstroke", "Titan's Revenge"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Rhyme"], ["Spirit (shield)", "Stormshield"]),
+      helm: T(["Lore", "Peasant Crown"], ["Harlequin Crest", "Vampire Gaze"], ["Griffon's Eye", "Harlequin Crest", "Andariel's Visage"]),
+      armor: T(["Stealth", "Smoke"], ["Treachery", "Skin of the Vipermagi"], ["Enigma", "Chains of Honor"]),
+      gloves: T(["Bloodfist", "Rare javelin gloves"], ["Rare javelin gloves"], ["Rare javelin gloves"]),
+      belt: T(["Rare/Crafted belt"], ["Thundergod's Vigor"], ["Thundergod's Vigor"]),
+      boots: T(["Treads of Cthon"], ["War Traveler", "Waterwalk"], ["Sandstorm Trek", "Rare tri-res boots", "War Traveler"]),
+      amulet: T(["The Eye of Etlich"], ["Cat's Eye", "Saracen's Chance"], ["Highlord's Wrath", "Mara's Kaleidoscope"]),
+      merc_weapon: T(["Insight"], ["Insight"], ["Infinity"]),
     },
     charms: ["Crack of the Heavens", "Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — life/res"],
-    notes: "Infinity merc is the biggest upgrade for lightning immunes. Throw IAS matters more than FCR.",
-  },
-  {
-    id: "summon-necro", name: "Summon Necromancer", cls: "Necromancer", caster: true, fcrTarget: 75,
-    base: CASTER_COMMON,
+    notes: "S+ tier. Infinity merc is the biggest upgrade for lightning immunes; throw IAS matters more than FCR." },
+  { id: "strike-zon", name: "Lightning Strike / Charged Strike Javazon", cls: "Amazon", caster: false, base: MELEE_COMMON,
     slots: {
-      weapon: [["Spirit (sword)", "Magic caster weapon"], ["Arm of King Leoric", "White"], ["Heart of the Oak", "Arm of King Leoric"]],
-      offhand: [["Ancient's Pledge"], ["Homunculus", "Spirit (shield)"], ["Homunculus", "Spirit (shield)"]],
-      gloves: [["Chance Guards"], ["Trang-Oul's Claws", "Magefist"], ["Trang-Oul's Claws", "Magefist"]],
-      belt: [["Rare/Crafted belt"], ["String of Ears", "Arachnid Mesh"], ["Arachnid Mesh", "Verdungo's Hearty Cord"]],
-      boots: [["Treads of Cthon"], ["Waterwalk", "Silkweave"], ["Marrowwalk", "Sandstorm Trek"]],
+      weapon: T(["Titan's Revenge"], ["Titan's Revenge"], ["Thunderstroke", "Titan's Revenge"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Stormshield", "Spirit (shield)"]),
+      helm: T(["Lore"], ["Vampire Gaze", "Harlequin Crest"], ["Andariel's Visage", "Griffon's Eye"]),
+      gloves: T(["Rare javelin gloves"], ["Rare javelin gloves"], ["Rare javelin gloves", "Dracul's Grasp"]),
+      belt: T(["Rare/Crafted belt"], ["Thundergod's Vigor"], ["Thundergod's Vigor", "Nosferatu's Coil"]),
+      merc_weapon: T(["Insight"], ["Insight"], ["Infinity"]),
+    },
+    charms: ["Crack of the Heavens", "Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — life/res"],
+    notes: "Melee lightning javazon — stronger single target (bosses) than Fury, needs leech and attack speed." },
+  { id: "strafe-zon", name: "Strafe Bowazon", cls: "Amazon", caster: false, base: MELEE_COMMON, slots: BOW_SLOTS,
+    charms: ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — life/res"],
+    notes: "Physical bow build. Windforce or Faith; a decrepify/might merc and Bone Break help with physical immunes." },
+  { id: "multishot-zon", name: "Multi-Shot Bowazon", cls: "Amazon", caster: false, base: MELEE_COMMON, slots: BOW_SLOTS,
+    charms: ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — life/res"],
+    notes: "Pack clearer with the same gear as Strafe; +Bow skills on gloves and skillers scale it." },
+  { id: "freezing-zon", name: "Freezing Arrow Bowazon", cls: "Amazon", caster: false, base: MELEE_COMMON, slots: BOW_SLOTS,
+    charms: ["Cold Rupture", "Annihilus", "Hellfire Torch", "Skiller grand charm"],
+    notes: "Cold bow build — +skills matter more than raw damage; Cold Rupture for cold immunes." },
+
+  // ===== ASSASSIN =====
+  { id: "trapsin", name: "Lightning Sentry Trapsin", cls: "Assassin", caster: true, fcrTarget: 102, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Spirit (sword)", "Rare trap claw"], ["Heart of the Oak", "Rare trap claw"], ["Rare trap claw", "Heart of the Oak"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Rare off-hand claw"], ["Spirit (shield)", "Rare off-hand claw"]),
+      helm: T(["Lore"], ["Harlequin Crest"], ["Griffon's Eye", "Harlequin Crest"]),
+      boots: T(["Treads of Cthon"], ["Waterwalk", "Silkweave"], ["Shadow Dancer", "Sandstorm Trek"]),
+    },
+    charms: ["Crack of the Heavens", ...CASTER_SKILLS],
+    notes: "S tier. Trap laying uses cast rate — 102% FCR is the goal (65% is the cheap step)." },
+  { id: "mosaic", name: "Mosaic Martial Arts", cls: "Assassin", caster: false, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Rare trap claw"], ["Chaos", "Mosaic"], ["Mosaic"]),
+      offhand: T(["Rare off-hand claw"], ["Chaos", "Mosaic"], ["Mosaic"]),
+      helm: T(["Rockstopper"], ["Harlequin Crest", "Vampire Gaze"], ["Harlequin Crest", "Andariel's Visage", "Griffon's Eye"]),
+      gloves: T(["Bloodfist"], ["Magefist", "Laying of Hands"], ["Dracul's Grasp", "Laying of Hands"]),
+      boots: T(["Treads of Cthon"], ["Gore Rider", "War Traveler"], ["Shadow Dancer", "Sandstorm Trek"]),
     },
     charms: ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — life/res"],
-    notes: "Skeletons scale with +skills; FCR mainly speeds Corpse Explosion/curses. Summoning skiller GCs.",
-  },
-  {
-    id: "wind-druid", name: "Wind Druid (Tornado/Hurricane)", cls: "Druid", caster: true, fcrTarget: 99,
-    base: CASTER_COMMON,
+    notes: "Mosaic is Non-Ladder only in 3.3 (pulled from Ladder pending a redesign). Dual-claw: off-hand = second claw." },
+  { id: "kicksin", name: "Kicksin (Dragon Talon)", cls: "Assassin", caster: false, base: MELEE_COMMON,
     slots: {
-      helm: [["Lore"], ["Jalal's Mane", "Rare druid pelt"], ["Jalal's Mane", "Rare druid pelt"]],
-      offhand: [["Ancient's Pledge"], ["Spirit (shield)"], ["Spirit (shield)", "Lidless Wall"]],
-      merc_weapon: [["Insight"], ["Insight"], ["The Reaper's Toll", "Infinity"]],
+      weapon: T(["Rare trap claw"], ["Chaos"], ["Grief", "Chaos"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Stormshield", "Spirit (shield)"]),
+      boots: T(["Treads of Cthon"], ["Gore Rider"], ["Shadow Dancer", "Gore Rider"]),
+    },
+    charms: MELEE_CHARMS,
+    notes: "Kick damage comes from boots — Shadow Dancer / Gore Rider. Fade + Burst of Speed for defense and IAS." },
+  { id: "wof-sin", name: "Wake of Fire / Death Sentry Trapsin", cls: "Assassin", caster: true, fcrTarget: 102, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Spirit (sword)", "Rare trap claw"], ["Rare trap claw"], ["Rare trap claw", "Heart of the Oak"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Spirit (shield)", "Rare off-hand claw"]),
+      boots: T(["Treads of Cthon"], ["Waterwalk"], ["Shadow Dancer", "Sandstorm Trek"]),
+    },
+    charms: ["Flame Rift", ...CASTER_SKILLS],
+    notes: "Fire traps with Death Sentry corpse explosions. Flame Rift for fire immunes." },
+  { id: "bladefury", name: "Blade Fury Assassin", cls: "Assassin", caster: true, fcrTarget: 102, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Rare trap claw"], ["Rare trap claw", "Chaos"], ["Chaos", "Rare trap claw"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Spirit (shield)", "Rare off-hand claw"]),
+    },
+    charms: ["Bone Break", ...CASTER_SKILLS],
+    notes: "Physical/magic hybrid ranged Shadow build; Bone Break for physical immunes." },
+
+  // ===== BARBARIAN =====
+  { id: "berserk-barb", name: "Berserk Barbarian", cls: "Barbarian", caster: false, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Steel", "Kingslayer"], ["Grief"], ["Grief", "Breath of the Dying"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Stormshield", "Grief"]),
+      helm: T(["Rockstopper"], ["Arreat's Face"], ["Arreat's Face", "Andariel's Visage"]),
+    },
+    charms: ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — life/res"],
+    notes: "S tier. Berserk deals magic damage — ignores physical immunes; Black Cleft for magic immunes." },
+  { id: "ww-barb", name: "Whirlwind Barbarian", cls: "Barbarian", caster: false, base: MELEE_COMMON,
+    slots: {
+      helm: T(["Rockstopper", "Guillaume's Face"], ["Arreat's Face"], ["Arreat's Face", "Andariel's Visage"]),
+      offhand: T(["Steel", "Ancient's Pledge"], ["Grief", "Kingslayer"], ["Grief", "Breath of the Dying", "Last Wish"]),
+      weapon: T(["Steel"], ["Grief", "Death Cleaver"], ["Grief", "Breath of the Dying", "Last Wish"]),
+    },
+    charms: ["Bone Break", "Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — life/res"],
+    notes: "Dual-wield (off-hand = second weapon). Grief + Last Wish/BotD endgame." },
+  { id: "throw-barb", name: "Double Throw Barbarian", cls: "Barbarian", caster: false, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Steel"], ["Gimmershred", "Warshrike"], ["Warshrike", "Gimmershred"]),
+      offhand: T(["Steel"], ["Gimmershred", "Warshrike"], ["Warshrike", "Gimmershred", "Lawbringer"]),
+      helm: T(["Rockstopper"], ["Arreat's Face"], ["Arreat's Face", "Andariel's Visage"]),
+    },
+    charms: ["Bone Break", "Annihilus", "Hellfire Torch", "Skiller grand charm"],
+    notes: "Two throwing weapons that replenish. Lawbringer in the off-hand is a popular decrepify option." },
+  { id: "frenzy-barb", name: "Frenzy Barbarian", cls: "Barbarian", caster: false, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Steel"], ["Grief", "Kingslayer"], ["Grief", "Breath of the Dying"]),
+      offhand: T(["Steel"], ["Grief", "Kingslayer"], ["Breath of the Dying", "Grief", "Doom"]),
+      helm: T(["Rockstopper"], ["Arreat's Face"], ["Arreat's Face", "Andariel's Visage"]),
+    },
+    charms: ["Bone Break", "Annihilus", "Hellfire Torch", "Skiller grand charm"],
+    notes: "Dual-wield single-target build; strong with leech and a might merc." },
+  { id: "singer-barb", name: "Singer Barbarian (War Cry)", cls: "Barbarian", caster: true, fcrTarget: 105, base: CASTER_COMMON,
+    slots: {
+      helm: T(["Lore"], ["Arreat's Face", "Rare Warcries helm"], ["Rare Warcries helm", "Arreat's Face"]),
+      weapon: T(["Spirit (sword)"], ["Heart of the Oak"], ["Heart of the Oak", "Call to Arms"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Spirit (shield)"]),
+      swap: T([], ["Spirit (sword)"], ["Call to Arms"]),
     },
     charms: ["Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — FHR"],
-    notes: "Tornado is physical and Hurricane is cold — a Reaper's Toll merc (decrepify) handles physical immunes. 99% FCR target.",
-  },
-  {
-    id: "trapsin", name: "Lightning Sentry Trapsin", cls: "Assassin", caster: true, fcrTarget: 102,
-    base: CASTER_COMMON,
+    notes: "War Cry caster — stuns and damages; +Warcries skillers and FCR to 105%." },
+
+  // ===== DRUID =====
+  { id: "wind-druid", name: "Wind Druid (Tornado/Hurricane)", cls: "Druid", caster: true, fcrTarget: 99, base: CASTER_COMMON,
     slots: {
-      weapon: [["Spirit (sword)", "Rare trap claw"], ["Heart of the Oak", "Rare trap claw"], ["Rare trap claw", "Heart of the Oak"]],
-      offhand: [["Ancient's Pledge"], ["Spirit (shield)", "Rare off-hand claw"], ["Spirit (shield)", "Rare off-hand claw"]],
-      helm: [["Lore"], ["Harlequin Crest"], ["Griffon's Eye", "Harlequin Crest"]],
-      boots: [["Treads of Cthon"], ["Waterwalk", "Silkweave"], ["Shadow Dancer", "Sandstorm Trek"]],
+      helm: T(["Lore"], ["Jalal's Mane", "Rare druid pelt"], ["Jalal's Mane", "Rare druid pelt"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Spirit (shield)", "Lidless Wall"]),
+      merc_weapon: T(["Insight"], ["Insight"], ["The Reaper's Toll", "Infinity"]),
     },
-    charms: ["Crack of the Heavens", "Annihilus", "Hellfire Torch", "Skiller grand charm", "Small charm — FHR"],
-    notes: "Trap laying uses cast rate — 102% FCR is the goal (65% is the cheap step).",
-  },
+    charms: CASTER_SKILLS,
+    notes: "Tornado is physical, Hurricane cold — a Reaper's Toll merc (decrepify) handles physical immunes. 99% FCR target." },
+  { id: "fire-druid", name: "Fire Druid (Fissure/Volcano)", cls: "Druid", caster: true, fcrTarget: 99, base: CASTER_COMMON,
+    slots: {
+      helm: T(["Lore"], ["Rare druid pelt", "Jalal's Mane"], ["Rare druid pelt", "Jalal's Mane"]),
+      weapon: T(["Spirit (sword)"], ["Heart of the Oak"], ["Ondal's Wisdom", "Heart of the Oak"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Spirit (shield)"]),
+    },
+    charms: ["Flame Rift", ...CASTER_SKILLS],
+    notes: "Fissure/Volcano/Armageddon. Flame Rift for fire immunes; Ondal's frees the off-hand only if it's two-handed (leave Spirit shield empty then)." },
+  { id: "summon-druid", name: "Summon Druid", cls: "Druid", caster: true, fcrTarget: 99, base: CASTER_COMMON,
+    slots: {
+      helm: T(["Lore"], ["Jalal's Mane"], ["Jalal's Mane", "Rare druid pelt"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Spirit (shield)"]),
+    },
+    charms: CASTER_SKILLS,
+    notes: "Grizzly, wolves and Oak Sage do the work; +skills and survivability over FCR." },
+  { id: "fury-druid", name: "Fury Werewolf Druid", cls: "Druid", caster: false, base: MELEE_COMMON,
+    slots: {
+      helm: T(["Rockstopper"], ["Jalal's Mane", "Rare Shape Shifting pelt"], ["Rare Shape Shifting pelt", "Jalal's Mane"]),
+      weapon: T(["Steel"], ["Grief", "Beast"], ["Grief", "Beast", "Breath of the Dying"]),
+    },
+    charms: ["Bone Break", ...MELEE_CHARMS],
+    notes: "Werewolf form; IAS breakpoints are form-specific. Beast's Fanaticism stacks well." },
+  { id: "werebear", name: "Werebear Druid (Shock Wave)", cls: "Druid", caster: false, base: MELEE_COMMON,
+    slots: {
+      helm: T(["Rockstopper"], ["Jalal's Mane", "Rare Shape Shifting pelt"], ["Rare Shape Shifting pelt", "Jalal's Mane"]),
+      weapon: T(["Steel"], ["Beast", "Grief"], ["Beast", "Grief"]),
+    },
+    charms: MELEE_CHARMS,
+    notes: "Tanky Werebear stunning with Shock Wave; Beast or Grief weapon." },
+
+  // ===== NECROMANCER =====
+  { id: "pnova-necro", name: "Poison Nova Necromancer", cls: "Necromancer", caster: true, fcrTarget: 125, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Magic caster weapon", "White"], ["Heart of the Oak", "Death's Web"], ["Death's Web"]),
+      offhand: T(["Ancient's Pledge"], ["Homunculus", "Rare necro head"], ["Rare necro head", "Homunculus"]),
+      gloves: T(["Chance Guards"], ["Trang-Oul's Claws", "Magefist"], ["Trang-Oul's Claws", "Magefist"]),
+    },
+    charms: ["Rotting Fissure", ...CASTER_SKILLS],
+    notes: "S tier. Death's Web's -poison res is the key item; Rotting Fissure for poison immunes." },
+  { id: "summon-necro", name: "Summon Necromancer", cls: "Necromancer", caster: true, fcrTarget: 75, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Spirit (sword)", "Magic caster weapon"], ["Arm of King Leoric", "White"], ["Heart of the Oak", "Arm of King Leoric"]),
+      offhand: T(["Ancient's Pledge"], ["Homunculus", "Spirit (shield)"], ["Homunculus", "Spirit (shield)"]),
+      gloves: T(["Chance Guards"], ["Trang-Oul's Claws", "Magefist"], ["Trang-Oul's Claws", "Magefist"]),
+      belt: T(["Rare/Crafted belt"], ["String of Ears", "Arachnid Mesh"], ["Arachnid Mesh", "Verdungo's Hearty Cord"]),
+      boots: T(["Treads of Cthon"], ["Waterwalk", "Silkweave"], ["Marrowwalk", "Sandstorm Trek"]),
+    },
+    charms: CASTER_SKILLS,
+    notes: "Skeletons scale with +skills; FCR mainly speeds Corpse Explosion/curses." },
+  { id: "bone-necro", name: "Bone Spear Necromancer", cls: "Necromancer", caster: true, fcrTarget: 125, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["White"], ["White", "Heart of the Oak"], ["Death's Web", "Heart of the Oak"]),
+      offhand: T(["Ancient's Pledge"], ["Rare necro head", "Homunculus"], ["Rare necro head", "Homunculus"]),
+      gloves: T(["Chance Guards"], ["Trang-Oul's Claws", "Magefist"], ["Trang-Oul's Claws", "Magefist"]),
+    },
+    charms: ["Black Cleft", ...CASTER_SKILLS],
+    notes: "Bone Spear is magic damage; Black Cleft is the only sunder that matters (magic immunes are rare)." },
+  { id: "bonespirit-necro", name: "Bone Spirit Necromancer", cls: "Necromancer", caster: true, fcrTarget: 125, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["White"], ["Heart of the Oak"], ["Death's Web", "Heart of the Oak"]),
+      offhand: T(["Ancient's Pledge"], ["Rare necro head"], ["Rare necro head", "Homunculus"]),
+      gloves: T(["Chance Guards"], ["Trang-Oul's Claws"], ["Trang-Oul's Claws", "Magefist"]),
+    },
+    charms: ["Black Cleft", ...CASTER_SKILLS],
+    notes: "Homing single-target bone build for bosses; pairs with Bone Spear for packs." },
+  { id: "curse-necro", name: "Corpse Explosion / Amp Necromancer", cls: "Necromancer", caster: true, fcrTarget: 125, base: CASTER_COMMON,
+    slots: {
+      offhand: T(["Ancient's Pledge"], ["Homunculus"], ["Homunculus", "Rare necro head"]),
+      gloves: T(["Chance Guards"], ["Trang-Oul's Claws"], ["Trang-Oul's Claws", "Magefist"]),
+      merc_weapon: T(["Insight"], ["Insight", "Obedience"], ["The Reaper's Toll", "Insight"]),
+    },
+    charms: CASTER_SKILLS,
+    notes: "Merc and minions make corpses; Corpse Explosion does fire + physical, hits most immunes." },
+
+  // ===== PALADIN =====
+  { id: "hammerdin", name: "Hammerdin (Blessed Hammer)", cls: "Paladin", caster: true, fcrTarget: 125, base: CASTER_COMMON,
+    slots: {
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Herald of Zakarum"], ["Herald of Zakarum", "Spirit (shield)"]),
+      amulet: T(["Nokozan Relic", "The Eye of Etlich"], ["2/20 caster amulet", "Saracen's Chance"], ["Mara's Kaleidoscope", "Seraph's Hymn"]),
+      merc_weapon: T(["Insight"], ["Insight"], ["Insight", "Infinity"]),
+    },
+    charms: CASTER_SKILLS,
+    notes: "S+ tier. Hammers are magic damage — no sunder needed. 75% FCR is fine, 125% is endgame." },
+  { id: "fohdin", name: "FoHdin (Fist of the Heavens)", cls: "Paladin", caster: true, fcrTarget: 125, base: CASTER_COMMON,
+    slots: {
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Herald of Zakarum"], ["Herald of Zakarum", "Spirit (shield)"]),
+      helm: T(["Lore"], ["Harlequin Crest"], ["Griffon's Eye", "Harlequin Crest"]),
+      merc_weapon: T(["Insight"], ["Insight"], ["Infinity"]),
+    },
+    charms: ["Crack of the Heavens", ...CASTER_SKILLS],
+    notes: "Lightning + magic Holy Bolt hybrid; Conviction or Infinity merc and Crack of the Heavens." },
+  { id: "smiter", name: "Smiter (Uber killer)", cls: "Paladin", caster: false, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Steel", "Lawbringer"], ["Kingslayer", "Grief"], ["Grief"]),
+      offhand: T(["Ancient's Pledge", "Rhyme"], ["Herald of Zakarum", "Spirit (shield)"], ["Herald of Zakarum", "Exile"]),
+      helm: T(["Rockstopper", "Guillaume's Face"], ["Guillaume's Face", "Vampire Gaze"], ["Guillaume's Face", "Crown of Ages", "Andariel's Visage"]),
+      gloves: T(["Bloodfist"], ["Laying of Hands"], ["Dracul's Grasp", "Laying of Hands"]),
+    },
+    charms: MELEE_CHARMS,
+    notes: "Crushing blow + life tap + high block. Max resists matter more than raw damage for Ubers." },
+  { id: "zealot", name: "Zealot Paladin", cls: "Paladin", caster: false, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Steel"], ["Kingslayer", "Grief"], ["Grief", "Hand of Justice"]),
+      offhand: T(["Ancient's Pledge"], ["Herald of Zakarum", "Spirit (shield)"], ["Herald of Zakarum", "Exile"]),
+      armor: T(["Smoke"], ["Treachery", "Duress"], ["Fortitude", "Chains of Honor"]),
+    },
+    charms: ["Bone Break", ...MELEE_CHARMS],
+    notes: "Grief + Fortitude is the classic pairing; Fanaticism aura." },
+  { id: "dreamadin", name: "Dreamadin (Holy Shock)", cls: "Paladin", caster: false, base: MELEE_COMMON,
+    slots: {
+      helm: T(["Lore"], ["Vampire Gaze"], ["Dream (helm)"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Herald of Zakarum"], ["Dream (shield)"]),
+      weapon: T(["Steel"], ["Kingslayer"], ["Grief", "Hand of Justice"]),
+      armor: T(["Smoke"], ["Treachery"], ["Chains of Honor", "Fortitude"]),
+    },
+    charms: ["Crack of the Heavens", ...MELEE_CHARMS],
+    notes: "Dream helm + Dream shield stack Holy Shock with Conviction for lightning damage on Zeal." },
+
+  // ===== SORCERESS =====
+  { id: "blizz-sorc", name: "Blizzard Sorceress", cls: "Sorceress", caster: true, fcrTarget: 105, base: CASTER_COMMON,
+    slots: {
+      helm: T(["Lore", "Tarnhelm"], ["Harlequin Crest"], ["Harlequin Crest", "Nightwing's Veil"]),
+      amulet: T(["Nokozan Relic", "The Eye of Etlich"], ["Tal Rasha's Adjudication", "2/20 caster amulet"], ["Mara's Kaleidoscope", "Tal Rasha's Adjudication"]),
+      weapon: T(["Spirit (sword)", "Magic caster weapon"], ["The Oculus", "Heart of the Oak", "Memory"], ["Death's Fathom", "Heart of the Oak"]),
+    },
+    charms: ["Cold Rupture", ...CASTER_SKILLS],
+    notes: "S tier. 105% FCR (63% is the cheaper step). Cold Mastery + Cold Rupture handle cold immunes." },
+  { id: "light-sorc", name: "Lightning Sorceress (Chain Lightning)", cls: "Sorceress", caster: true, fcrTarget: 105, base: CASTER_COMMON,
+    slots: {
+      helm: T(["Lore", "Tarnhelm"], ["Harlequin Crest"], ["Griffon's Eye", "Harlequin Crest"]),
+      amulet: T(["Nokozan Relic", "The Eye of Etlich"], ["Tal Rasha's Adjudication", "2/20 caster amulet"], ["Mara's Kaleidoscope", "Tal Rasha's Adjudication"]),
+      weapon: T(["Spirit (sword)", "Magic caster weapon"], ["The Oculus", "Heart of the Oak", "Memory"], ["Eschuta's Temper", "Heart of the Oak"]),
+    },
+    charms: ["Crack of the Heavens", ...CASTER_SKILLS],
+    notes: "Lightning immunes: Infinity merc + Crack of the Heavens + Griffon's. 105% FCR target." },
+  { id: "nova-sorc", name: "Nova Sorceress", cls: "Sorceress", caster: true, fcrTarget: 105, base: CASTER_COMMON,
+    slots: {
+      helm: T(["Lore"], ["Harlequin Crest"], ["Griffon's Eye", "Harlequin Crest"]),
+      weapon: T(["Spirit (sword)"], ["Heart of the Oak", "The Oculus"], ["Eschuta's Temper", "Heart of the Oak"]),
+    },
+    charms: ["Crack of the Heavens", ...CASTER_SKILLS],
+    notes: "S+ tier in 3.3. Close-range lightning burst; Infinity merc essential." },
+  { id: "fire-sorc", name: "Fireball / Meteor Sorceress", cls: "Sorceress", caster: true, fcrTarget: 105, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Spirit (sword)"], ["The Oculus", "Heart of the Oak"], ["Eschuta's Temper", "Tal Rasha's Lidless Eye"]),
+      amulet: T(["Nokozan Relic"], ["Tal Rasha's Adjudication", "2/20 caster amulet"], ["Mara's Kaleidoscope", "Tal Rasha's Adjudication"]),
+      armor: T(["Stealth"], ["Skin of the Vipermagi"], ["Enigma", "Tal Rasha's Guardianship", "Ormus' Robes"]),
+    },
+    charms: ["Flame Rift", ...CASTER_SKILLS],
+    notes: "Magefist adds +1 Fire. Flame Rift for fire immunes; Tal Rasha's set is a strong alternative." },
+  { id: "orb-sorc", name: "Frozen Orb / Hydra Sorceress", cls: "Sorceress", caster: true, fcrTarget: 105, base: CASTER_COMMON,
+    slots: {
+      helm: T(["Lore"], ["Harlequin Crest"], ["Harlequin Crest", "Nightwing's Veil"]),
+      weapon: T(["Spirit (sword)"], ["The Oculus", "Heart of the Oak"], ["Death's Fathom", "Eschuta's Temper", "Tal Rasha's Lidless Eye"]),
+      armor: T(["Stealth"], ["Skin of the Vipermagi"], ["Enigma", "Ormus' Robes"]),
+    },
+    charms: ["Cold Rupture", ...CASTER_SKILLS],
+    notes: "Hybrid cold/fire covers immunes on its own; Ormus' Robes can roll +3 Frozen Orb or Hydra." },
+
+  // ===== WARLOCK =====
+  { id: "echo-lock", name: "Echoing Strike Warlock", cls: "Warlock", caster: true, fcrTarget: 75, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Insight", "Rare Warlock dagger"], ["Fortitude (weapon)", "Insight"], ["Arioc's Needle", "Fortitude (weapon)"]),
+      offhand: T(["Ancient's Pledge", "Rhyme"], ["Spirit (shield)", "Rhyme"], ["Ars Dul'Mephistos"]),
+      helm: T(["Rockstopper"], ["Guillaume's Face", "Tal Rasha's Horadric Crest"], ["Guillaume's Face", "Crown of Ages"]),
+      armor: T(["Smoke", "Duress"], ["Treachery", "Duress"], ["Enigma", "Fortitude"]),
+      amulet: T(["The Eye of Etlich"], ["Seraph's Hymn"], ["Highlord's Wrath"]),
+      ring: T(["Nagelring"], ["Raven Frost", "Rare/Crafted FCR ring"], ["Raven Frost", "Bul-Kathos' Wedding Band", "The Stone of Jordan"]),
+      gloves: T(["Magefist"], ["Trang-Oul's Claws", "Magefist"], ["Trang-Oul's Claws", "Steelrend"]),
+      belt: T(["String of Ears"], ["String of Ears"], ["Arachnid Mesh"]),
+      boots: T(["Waterwalk"], ["Waterwalk"], ["Sandstorm Trek"]),
+      merc_weapon: T(["Insight"], ["Insight", "Obedience"], ["Insight", "Breath of the Dying"]),
+    },
+    charms: ["Bone Break", "Annihilus", "Hellfire Torch", "Skiller grand charm"],
+    notes: "S tier. Echoing Strike scales with FCR, not IAS (so Arachnid over Goldwrap). Ethereal weapons are fine — they don't lose durability. One Cannot Be Frozen source is a must." },
+  { id: "chaos-lock", name: "Fire Warlock (Apocalypse / Flame Wave)", cls: "Warlock", caster: true, fcrTarget: 75, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Spirit (sword)", "Rare Warlock dagger"], ["Rare Warlock dagger", "Heart of the Oak"], ["Rare Warlock dagger", "Bloodpact Shard"]),
+      offhand: T(["Ancient's Pledge"], ["Measured Wrath", "Spirit (shield)"], ["Ars Al'Diabolos", "Ars Dul'Mephistos"]),
+      helm: T(["Lore"], ["Hellwarden's Will", "Harlequin Crest"], ["Hellwarden's Will", "Harlequin Crest"]),
+      amulet: T(["The Eye of Etlich"], ["2/20 caster amulet", "Rare +3 skill-tree amulet"], ["Mara's Kaleidoscope", "Rare +3 skill-tree amulet"]),
+      ring: T(["Nagelring"], ["Opalvein", "The Stone of Jordan"], ["Opalvein", "The Stone of Jordan"]),
+      belt: T(["Rare/Crafted belt"], ["Gheed's Wager", "Arachnid Mesh"], ["Gheed's Wager", "Arachnid Mesh"]),
+      boots: T(["Treads of Cthon"], ["Wraithstep", "Waterwalk"], ["Wraithstep", "Sandstorm Trek"]),
+    },
+    charms: ["Flame Rift", ...CASTER_SKILLS],
+    notes: "Chaos tree fire — Apocalypse, Flame Wave, Ring of Fire. Ars Al'Diabolos adds +3-5 Apocalypse. Flame Rift for fire immunes." },
+  { id: "abyss-lock", name: "Magic Warlock (Miasma Chain / Abyss)", cls: "Warlock", caster: true, fcrTarget: 75, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Spirit (sword)", "Rare Warlock dagger"], ["Rare Warlock dagger", "Void"], ["Void", "Rare Warlock dagger"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Measured Wrath"], ["Ars Dul'Mephistos"]),
+      helm: T(["Lore"], ["Hellwarden's Will"], ["Hellwarden's Will", "Harlequin Crest"]),
+      amulet: T(["The Eye of Etlich"], ["Entropy Locket", "2/20 caster amulet"], ["Mara's Kaleidoscope", "Entropy Locket", "Rare +3 skill-tree amulet"]),
+      ring: T(["Nagelring"], ["Sling", "Opalvein"], ["Sling", "Opalvein"]),
+      belt: T(["Rare/Crafted belt"], ["Gheed's Wager"], ["Gheed's Wager", "Arachnid Mesh"]),
+      boots: T(["Treads of Cthon"], ["Wraithstep"], ["Wraithstep", "Sandstorm Trek"]),
+      merc_weapon: T(["Insight"], ["Insight"], ["Insight", "The Reaper's Toll"]),
+    },
+    charms: ["Black Cleft", ...CASTER_SKILLS],
+    notes: "Miasma Chain main skill, Abyss for big packs, Enhanced Entropy passive. Magic res reduction (Sling, Gheed's Wager, Ars Dul'Mephistos) stacks." },
+  { id: "blades-lock", name: "Mirrored Blades Warlock", cls: "Warlock", caster: false, base: MELEE_COMMON,
+    slots: {
+      weapon: T(["Rare Warlock dagger"], ["Dreadfang", "Insight"], ["Dreadfang", "Arioc's Needle"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Horazon's Secrets"], ["Ars Dul'Mephistos", "Horazon's Secrets"]),
+      helm: T(["Rockstopper"], ["Hellwarden's Will", "Guillaume's Face"], ["Hellwarden's Will", "Andariel's Visage"]),
+      armor: T(["Smoke"], ["Treachery"], ["Enigma", "Fortitude"]),
+      boots: T(["Treads of Cthon"], ["Wraithstep"], ["Wraithstep", "Sandstorm Trek"]),
+    },
+    charms: ["Black Cleft", "Annihilus", "Hellfire Torch", "Skiller grand charm"],
+    notes: "Eldritch tree single-target magic damage; Dreadfang adds +3 Mirrored Blades." },
+  { id: "demon-lock", name: "Demon Summoner Warlock", cls: "Warlock", caster: true, fcrTarget: 75, base: CASTER_COMMON,
+    slots: {
+      weapon: T(["Spirit (sword)", "Rare Warlock dagger"], ["Bloodpact Shard", "Beast"], ["Bloodpact Shard", "Mang Song's Lesson", "Obsession"]),
+      offhand: T(["Ancient's Pledge"], ["Spirit (shield)"], ["Ars Tor'Baalos", "Spirit (shield)"]),
+      helm: T(["Lore"], ["Harlequin Crest"], ["Harlequin Crest"]),
+      amulet: T(["The Eye of Etlich"], ["2/20 caster amulet", "Seraph's Hymn"], ["Mara's Kaleidoscope", "Rare +3 skill-tree amulet"]),
+      boots: T(["Treads of Cthon"], ["Waterwalk"], ["Wraithstep", "Sandstorm Trek"]),
+      merc_weapon: T(["Insight"], ["Insight"], ["Insight", "The Reaper's Toll"]),
+    },
+    charms: CASTER_SKILLS,
+    notes: "Goatmen + Bind Demon army with Blood Oath and Death Mark. A Might merc suits Goatmen; Holy Freeze suits caster demons. Mang Song/Obsession are two-handed — needs Levitation Mastery to keep the grimoire." },
 ];
 
-// Resolve each build's slot tiers (build overrides on top of its base).
+// Resolve each build's slot tiers (build overrides on top of its base; null = slot unused).
 for (const b of BUILDS) {
   b.tiers = Object.assign({}, b.base, b.slots);
+  for (const k of Object.keys(b.tiers)) if (b.tiers[k] === null) delete b.tiers[k];
 }

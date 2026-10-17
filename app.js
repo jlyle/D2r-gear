@@ -6,6 +6,7 @@
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const byName = new Map(ITEMS.map((i) => [i.name, i]));
+  const DUAL_WIELD = ["Barbarian", "Assassin"]; // classes that can hold a weapon in the off-hand
   const uid = () => Math.random().toString(36).slice(2, 10);
 
   // ---------- accounts (encrypted on this device) ----------
@@ -336,11 +337,11 @@
 
   function itemOptions(c, slot, selected) {
     const b = buildOf(c);
-    const dualWield = slot.key === "offhand" && c.cls === "Barbarian";
+    const dualWield = slot.key === "offhand" && DUAL_WIELD.includes(c.cls);
     const pool = ITEMS.filter((i) => (i.slot === slot.list || (dualWield && i.slot === "weapon")) &&(!i.cls || i.cls === c.cls || slot.key.startsWith("merc")) && (!slot.mercOnly || i.merc));
     const mercClsOk = (i) => !(slot.key.startsWith("merc") && i.cls); // mercs can't use class items
     const usable = pool.filter(mercClsOk);
-    const opt = (i) => `<option value="${esc(i.name)}" ${i.name === selected ? "selected" : ""}>${esc(i.name)}${i.alias ? ` (${esc(i.alias)})` : ""} · lvl ${i.req}</option>`;
+    const opt = (i) => `<option value="${esc(i.name)}" ${i.name === selected ? "selected" : ""}>${esc(i.name)}${i.alias ? ` (${esc(i.alias)})` : ""} · lvl ${i.req ?? "?"}</option>`;
     let html = `<option value="">— empty —</option>`;
     const recNames = new Set();
     if (b && b.tiers[listKey(slot.key)]) {
@@ -362,6 +363,8 @@
   }
 
   function tierBadge(c, slotKey, name) {
+    const b = buildOf(c);
+    if (b && !b.tiers[listKey(slotKey)]) return `<span class="badge">not used by build</span>`;
     if (!name) return `<span class="badge">empty</span>`;
     const t = tierOf(buildOf(c), slotKey, name);
     if (t === null) return "";
@@ -440,7 +443,7 @@
   function slotsFor(c, it) {
     return [...GEAR_SLOTS, ...MERC_SLOTS].filter((s) => {
       const isMerc = s.key.startsWith("merc");
-      const listOk = it.slot === s.list || (s.key === "offhand" && c.cls === "Barbarian" && it.slot === "weapon");
+      const listOk = it.slot === s.list || (s.key === "offhand" && DUAL_WIELD.includes(c.cls) && it.slot === "weapon");
       if (!listOk) return false;
       if (isMerc) return !it.cls && (!s.mercOnly || it.merc);
       return !it.cls || it.cls === c.cls;
@@ -577,7 +580,7 @@
         ${fcrHtml}
         <div class="card">
           <h3>Charms</h3>
-          ${missingCharms.length ? `<div class="notes">Still to get:</div><ul class="sugg">${missingCharms.map((n) => `<li><span>${itemLine(byName.get(n))}</span><span class="runes">lvl ${byName.get(n)?.req}</span></li>`).join("")}</ul>` : `<p class="ok">All recommended charms in inventory.</p>`}
+          ${missingCharms.length ? `<div class="notes">Still to get:</div><ul class="sugg">${missingCharms.map((n) => `<li><span>${itemLine(byName.get(n))}</span><span class="runes">lvl ${byName.get(n)?.req ?? "?"}</span></li>`).join("")}</ul>` : `<p class="ok">All recommended charms in inventory.</p>`}
           <div class="notes">${cellsUsed(c)}/${INV_CELLS} cells used</div>
         </div>
       </div>
