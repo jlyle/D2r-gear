@@ -504,7 +504,7 @@
         </div>
       </div>
       ${typical.length ? `<div class="tip-h">Typical stats</div><ul class="tip-stats">${typical.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
-      ${mine.length ? `<hr class="tip-divider" ${typical.length ? "" : "hidden"}><div class="tip-h">Actual stats</div><ul class="tip-stats mine">${mine.map((l) => `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
+      ${mine.length ? `<hr class="tip-divider" ${typical.length ? "" : "hidden"}><div class="tip-h">Actual stats</div><ul class="tip-stats mine">${mine.map((l) => /\(check\)$/.test(l) ? `<li class="check-line" title="Not read from the photo — tap Edit stats to enter your roll">${esc(l.replace(/\s*\(check\)$/, ""))}<span class="chk">check</span></li>` : `<li>${esc(l)}</li>`).join("")}</ul>` : ""}
       <div class="tip-actions">
         <label class="link">📷 Scan stats<input type="file" class="scan-in" accept="image/*" capture="environment" hidden></label>
         <label class="link">🖼 From gallery<input type="file" class="scan-in" accept="image/*" hidden></label>

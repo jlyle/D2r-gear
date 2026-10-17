@@ -243,3 +243,5 @@ dialog h2 { font-size: 18px; }
 .n-misc { color: #c8b89a; }
 .custom-add { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 10px; }
 .custom-add summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+.tip-stats.mine li.check-line { color: var(--warn); }
+.chk { margin-left: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--warn); border-radius: 99px; padding: 0 6px; vertical-align: 1px; }

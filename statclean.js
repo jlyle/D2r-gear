@@ -225,7 +225,9 @@
     });
   }
   function cleanStatsForItem(text, itemStats) {
-    const tpls = String(itemStats || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter((t) => t && !/per character level/.test(t));
+    const allTpls = String(itemStats || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter(Boolean);
+    const perLevel = allTpls.filter((t) => /per character level/.test(t));
+    const tpls = allTpls.filter((t) => !/per character level/.test(t));
     // Drop base-item lines (Required Strength, Durability, Defense:) so they can't pose as stats.
     const lines = String(text || "").split(/\n+/).map((l) => l.trim())
       .filter((l) => letters(l).length >= 4 && !/^[^a-z]*(required|durability|defense\s*:|chance to block|one.hand|two.hand|throw damage|quantity|item version|.*class\s*-)/i.test(normalize(l)));
@@ -262,6 +264,18 @@
         if (!out.some((o) => o.text.replace(/[+\-]?\d+(?:-\d+)?/g, "#").toLowerCase() === key)) out.push({ at: li, text: p });
       }
     });
+    // The item is confirmed, so every stat it always carries belongs on it — even lines the photo
+    // couldn't read. Fixed values are certain; unread rolled values keep their range, flagged.
+    const isRange = (t) => /\d+(?:\.\d+)?\s*-\s*\d+/.test(t.replace(/^adds\b.*/i, ""));
+    tpls.forEach((t, ti) => {
+      if (used.has(ti)) return;
+      out.push({ at: 1e6 + ti, text: isRange(t) ? `${t} (check)` : t });
+    });
+    for (const t of perLevel) {
+      const stat = (t.match(/per character level/) && t.replace(/^\+[\d.%]+\s*/, "").replace(/\s*per character level/, "")).toLowerCase();
+      const already = out.some((o) => /based on character level/i.test(o.text) && o.text.toLowerCase().includes(stat.replace(/^%\s*/, "").split(" ").pop()));
+      if (!already) out.push({ at: 2e6, text: t });
+    }
     return out.sort((a, b) => a.at - b.at).map((o) => o.text);
   }
 

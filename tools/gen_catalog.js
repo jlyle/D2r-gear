@@ -110,6 +110,20 @@ function prop(code, par, min, max) {
   return null; // uncommon codes are left out of the summary
 }
 
+// The game tooltip folds equal Str/Dex/Vit/Enr into "All Attributes" and equal
+// fire/cold/lightning/poison resists into "All Resistances"; do the same.
+function fold(lines) {
+  const grab = (re) => lines.map((l) => l.match(re)).filter(Boolean);
+  const attrs = grab(/^\+([\d-]+) to (Strength|Dexterity|Vitality|Energy)$/);
+  if (attrs.length === 4 && attrs.every((m) => m[1] === attrs[0][1])) {
+    lines = lines.filter((l) => !attrs.some((m) => m[0] === l)); lines.push(`+${attrs[0][1]} to All Attributes`);
+  }
+  const res = grab(/^(Fire|Cold|Lightning|Poison) Resist \+([\d-]+)%$/);
+  if (res.length === 4 && res.every((m) => m[2] === res[0][2])) {
+    lines = lines.filter((l) => !res.some((m) => m[0] === l)); lines.push(`All Resistances +${res[0][2]}`);
+  }
+  return lines;
+}
 function propsOf(rec, pre, n, pfx = "") {
   const out = [];
   for (let i = 1; i <= n; i++) {
@@ -117,7 +131,7 @@ function propsOf(rec, pre, n, pfx = "") {
     const t = prop(code, rec[`${pfx}par${i}`] ?? rec[`${pre.replace(/Code$/, "Param")}${i}`], rec[`${pfx}min${i}`] ?? rec[`${pre.replace(/Code$/, "Min")}${i}`], rec[`${pfx}max${i}`] ?? rec[`${pre.replace(/Code$/, "Max")}${i}`]);
     if (t) out.push(t);
   }
-  return [...new Set(out)];
+  return fold([...new Set(out)]);
 }
 // dmg-fire style pairs come as fire-min / fire-max in item files
 function elemPairs(rec, n) {
