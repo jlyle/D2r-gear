@@ -102,6 +102,12 @@
     "javelin spear bow crossbow traps shadow disciplines martial arts combat warcries masteries shape shifting elemental summoning curses " +
     "bone offensive defensive auras chaos demon eldritch seconds against uninterruptable").split(" ");
   const D = new Set(CORE);
+  const CLASSES = ["amazon", "assassin", "barbarian", "druid", "necromancer", "paladin", "sorceress", "warlock"];
+  function CLASS_FIX(w) {
+    let best = null, bd = 99;
+    for (const c of CLASSES) { const d = wlev(w, c); if (d < bd) { bd = d; best = c; } }
+    return bd <= Math.max(2, w.length * 0.35) ? best : null;
+  }
   const OCR_FIX = { al: "all", ys: "vs", fo: "to", te: "to", t0: "to", ot: "of", lite: "life", iife: "life" };
 
   function lev(a, b) {
@@ -115,11 +121,28 @@
     }
     return prev[n];
   }
+  // Letters D2R's small-caps font makes look alike: a swap between them costs little.
+  const CONF = ["cg", "pd", "eo", "il", "ij", "nh", "rt", "mn", "uv", "vy", "bh", "ce", "ao", "fl", "uo", "rn", "kx", "ti"];
+  const confusable = new Set(CONF.flatMap(([x, y]) => [x + y, y + x]));
+  function wlev(a, b) {
+    const m = a.length, n = b.length;
+    if (!m || !n) return m || n;
+    let prev = Array.from({ length: n + 1 }, (_, j) => j);
+    for (let i = 1; i <= m; i++) {
+      const row = [i];
+      for (let j = 1; j <= n; j++) {
+        const sub = a[i - 1] === b[j - 1] ? 0 : confusable.has(a[i - 1] + b[j - 1]) ? 0.35 : 1;
+        row[j] = Math.min(prev[j] + 1, row[j - 1] + 1, prev[j - 1] + sub);
+      }
+      prev = row;
+    }
+    return prev[n];
+  }
   function closest(w) {
-    if (w.length < 5) return null;
+    if (w.length < 4) return null;
     let best = null, bd = 99;
-    for (const d of D) { if (Math.abs(d.length - w.length) > 2) continue; const x = lev(w, d); if (x < bd) { bd = x; best = d; } }
-    return bd <= (w.length >= 7 ? 2 : 1) ? best : null;
+    for (const d of D) { if (Math.abs(d.length - w.length) > 2) continue; const x = wlev(w, d); if (x < bd) { bd = x; best = d; } }
+    return bd <= (w.length >= 7 ? 2 : w.length >= 5 ? 1.4 : 0.8) ? best : null;
   }
   // Lower-case, fix symbols, merge "reduc ed", repair "vitahty". Skill names it doesn't know are left alone.
   function normalize(raw) {
@@ -129,6 +152,8 @@
       .replace(/(^|\s)[il|]\s?(?=\d)/g, "$11") // "I 1%" → "11%"
       .replace(/[—–]/g, "-").replace(/([+\-])\s+(\d)/g, "$1$2").replace(/(\d)\s+%/g, "$1%")
       .replace(/[|\[\]{}=_~;]/g, " ").replace(/\s+/g, " ").trim();
+    // "(barbarian euy)" / "(bansanian nvyv)" → "(barbarian only)"
+    s = s.replace(/\(\s*([a-z]{5,12})\s+[a-z]{2,5}\s*\)?$/, (m, c) => { const k = CLASS_FIX(c); return k ? `(${k} only)` : m; });
     const toks = s.split(" ");
     const out = [];
     for (let i = 0; i < toks.length; i++) {
@@ -168,5 +193,77 @@
     return out;
   }
 
-  root.StatClean = { cleanStats, parseLine };
+  // ---------- item-aware matching ----------
+  // When the item is known, its game-data stat lines are templates: match each photo
+  // line to the closest template by letters, then take the numbers from the photo.
+  const letters = (s) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const NUM_RE = /(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?/g;
+  function photoNumbers(line) {
+    const fixed = line.replace(/(?<=\d)[oO](?=\d|\b)/g, "0").replace(/(?<=\d)[lI|](?=\d)/g, "1").replace(/\b[lI|](?=\d)/g, "1");
+    return [...fixed.matchAll(/\d+/g)].map((m) => Number(m[0]));
+  }
+  function fillTemplate(tpl, nums) {
+    // "Adds 15-35 Damage" / "5-30 fire damage": min and max are separate fixed numbers.
+    if (/^adds\b|\bto \d+ \w+ damage/i.test(tpl)) {
+      const m = tpl.match(/(\d+)\s*(?:-|to)\s*(\d+)/);
+      if (m && nums.length >= 2) {
+        const i = nums.findIndex((n, j) => j + 1 < nums.length && n <= nums[j + 1]);
+        if (i >= 0) return tpl.replace(m[0], `${nums[i]}-${nums[i + 1]}`);
+      }
+      return tpl;
+    }
+    let k = 0;
+    return tpl.replace(NUM_RE, (m, a, b) => {
+      const lo = Number(a), hi = b != null ? Number(b) : lo;
+      // take the next photo number that fits this stat's range (a little slack for rounding)
+      for (let i = k; i < nums.length; i++) {
+        const n = nums[i];
+        if (n >= Math.floor(lo * 0.95) && n <= Math.ceil(hi * 1.05)) { k = i + 1; return String(n); }
+      }
+      if (b == null) return a;      // fixed value: trust the game data
+      return m;                      // variable and unreadable: leave the range so it's obvious to edit
+    });
+  }
+  function cleanStatsForItem(text, itemStats) {
+    const tpls = String(itemStats || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter((t) => t && !/per character level/.test(t));
+    // Drop base-item lines (Required Strength, Durability, Defense:) so they can't pose as stats.
+    const lines = String(text || "").split(/\n+/).map((l) => l.trim())
+      .filter((l) => letters(l).length >= 4 && !/^[^a-z]*(required|durability|defense\s*:|chance to block|one.hand|two.hand|throw damage|quantity|item version|.*class\s*-)/i.test(normalize(l)));
+    // Score every (photo line, stat template) pair, then assign best matches first.
+    const pairs = [];
+    lines.forEach((line, li) => {
+      const L = letters(normalize(line));
+      tpls.forEach((t, ti) => {
+        const T = letters(t);
+        let s = L.length < T.length ? 1 - wlev(L, T) / T.length : 0;
+        // the photo line may carry junk at either end: slide a template-sized window over it
+        for (let off = 0; off <= Math.max(0, L.length - T.length); off += Math.max(1, Math.floor(T.length / 6))) {
+          s = Math.max(s, 1 - wlev(L.slice(off, off + T.length + 2), T) / Math.max(T.length, 1));
+        }
+        if (s >= 0.62) pairs.push({ li, ti, s });
+      });
+    });
+    pairs.sort((a, b) => b.s - a.s);
+    // Sanity check: a correctly identified item shows most of its known stat lines.
+    // If the photo matches too few of them, the item is probably wrong — read the photo generically.
+    const matchedTpls = new Set(pairs.filter((p) => p.s >= 0.7).map((p) => p.ti));
+    if (tpls.length && matchedTpls.size < Math.max(1, Math.ceil(tpls.length * 0.5))) return cleanStats(text);
+    const used = new Set(), taken = new Set(), out = [];
+    for (const p of pairs) {
+      if (used.has(p.ti) || taken.has(p.li)) continue;
+      used.add(p.ti); taken.add(p.li);
+      out.push({ at: p.li, text: fillTemplate(tpls[p.ti], photoNumbers(lines[p.li])) });
+    }
+    // Anything else the general parser recognises (e.g. "+148 to Life (Based on Character Level)", sockets).
+    lines.forEach((l, li) => {
+      if (taken.has(li)) return;
+      for (const p of parseLine(l)) {
+        const key = p.replace(/[+\-]?\d+/g, "#").toLowerCase();
+        if (!out.some((o) => o.text.replace(/[+\-]?\d+(?:-\d+)?/g, "#").toLowerCase() === key)) out.push({ at: li, text: p });
+      }
+    });
+    return out.sort((a, b) => a.at - b.at).map((o) => o.text);
+  }
+
+  root.StatClean = { cleanStats, parseLine, cleanStatsForItem };
 })(typeof window !== "undefined" ? window : globalThis);

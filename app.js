@@ -853,9 +853,10 @@
     const ctx = cv.getContext("2d");
     ctx.drawImage(bmp, 0, 0, w, h);
     const img = ctx.getImageData(0, 0, w, h), d = img.data;
+    // Brightest channel, so blue magic-property text stays as strong as white and gold text.
     for (let i = 0; i < d.length; i += 4) {
-      const g = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
-      const v = Math.max(0, Math.min(255, (255 - g - 40) * 1.6));
+      const g = Math.max(d[i], d[i + 1], d[i + 2]);
+      const v = Math.max(0, Math.min(255, (255 - g - 30) * 1.5));
       d[i] = d[i + 1] = d[i + 2] = v;
     }
     ctx.putImageData(img, 0, 0);
@@ -894,7 +895,8 @@
   ];
 
   function matchItems(text) {
-    const lines = text.split(/\n+/).map(norm).filter((l) => l.length >= 3);
+    // Name lines never contain digits; stat lines ("+15 to Strength") must not pose as names.
+    const lines = text.split(/\n+/).filter((l) => !/\d/.test(l)).map(norm).filter((l) => l.length >= 3);
     const flat = norm(text).replace(/[ ']/g, "");
     const scored = [];
     for (const it of ITEMS) {
@@ -902,7 +904,7 @@
       const names = [it.name.replace(/ \((sword|shield|helm|weapon)\)$/, ""), it.alias].filter(Boolean).map(norm);
       let best = 0;
       for (const nm of names) for (const l of lines) {
-        if (nm.length >= 6 && l.includes(nm)) best = Math.max(best, 1);
+        if (nm.length >= 6 && l.includes(nm) && l.length <= nm.length + 6) best = Math.max(best, 1);
         else best = Math.max(best, sim(l, nm));
       }
       if (it.runes && flat.includes(norm(it.runes).replace(/ /g, ""))) best = Math.max(best, 0.97); // rune recipe line
@@ -928,7 +930,11 @@
   const STAT_VOCAB = ITEMS.map((i) => i.stats).join(" ");
   function statNotes(text, it) {
     const skip = new Set(it ? [it.name, it.alias].filter(Boolean).map((n) => n.toLowerCase()) : []);
-    return StatClean.cleanStats(text, STAT_VOCAB).filter((l) => !skip.has(l.toLowerCase())).slice(0, 16).join("\n");
+    // Known unique/set/runeword: match against its own stat lines; otherwise the general parser.
+    const lines = it && it.stats && !["rare", "magic", "misc", "rune", "gem", "jewel"].includes(it.type) && !it.custom && !/Sunder/.test(it.stats)
+      ? StatClean.cleanStatsForItem(text, it.stats)
+      : StatClean.cleanStats(text, STAT_VOCAB);
+    return lines.filter((l) => !skip.has(l.toLowerCase())).slice(0, 18).join("\n");
   }
 
   function destinations(c, it) {
