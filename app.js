@@ -484,7 +484,7 @@
         <button class="link edit-note" type="button">✎ ${mine.length ? "Edit stats" : "Enter actual stats"}</button>
         <label class="link">📷 ${entry.photo ? "Retake photo" : "Take photo"}<input type="file" class="ph-in" accept="image/*" capture="environment" hidden></label>
         <label class="link">🖼 Gallery<input type="file" class="ph-in" accept="image/*" hidden></label>
-        ${entry.photo ? `<button class="link rm-ph" type="button">Remove photo</button>` : ""}
+        ${entry.photo ? `<button class="link reread" type="button">↻ Re-read stats from photo</button><button class="link rm-ph" type="button">Remove photo</button>` : ""}
       </div>
       <textarea class="note" rows="4" hidden placeholder="One stat per line, e.g. +35% Faster Cast Rate">${esc(mine.join("\n"))}</textarea>
     </div>`;
@@ -511,6 +511,22 @@
         try { const id = await storePhoto(f); dropPhoto(en.photo); en.photo = id; save(); render(); }
         catch (err) { alert("Couldn't save that photo on this device (storage may be full or blocked)."); }
       });
+      const rr = $(".reread", tip);
+      if (rr) rr.onclick = async () => {
+        const en = get(); if (!en?.photo) return;
+        const status = $("#scanStatus");
+        const progress = (m) => { status.textContent = m; status.hidden = false; };
+        try {
+          const worker = await getWorker(progress);
+          progress("Reading stats from photo…");
+          const blob = await (await fetch(await photoURL(en.photo))).blob();
+          const { data } = await worker.recognize(await prepImage(blob));
+          status.hidden = true;
+          const lines = statNotes(data.text || "", byName.get(en.item));
+          if (!lines) { alert("Couldn't find any stat lines in that photo. Try retaking it straight on, closer to the tooltip."); return; }
+          if (!en.note || confirm(`Replace the current stats with these?\n\n${lines}`)) { en.note = lines; save(); render(); }
+        } catch (err) { status.hidden = true; alert("Couldn't read the photo — the text reader needs an internet connection the first time it loads."); }
+      };
       const rm = $(".rm-ph", tip);
       if (rm) rm.onclick = () => { const en = get(); if (!en) return; dropPhoto(en.photo); delete en.photo; save(); render(); };
     });
@@ -777,6 +793,8 @@
     ocrWorker = await Tesseract.createWorker("eng", 1, {
       logger: (m) => { if (m.status === "recognizing text") progress(`Reading text… ${Math.round(m.progress * 100)}%`); },
     });
+    // Only characters that appear in tooltips — cuts most of the noise.
+    await ocrWorker.setParameters({ tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-%.,:()'/ " });
     return ocrWorker;
   }
 
@@ -861,16 +879,11 @@
     return out;
   }
 
-  // Stat lines worth keeping in the notes: drop the item name, base type and rune lines.
+  // Only real item properties from the photo, with OCR slips fixed (see statclean.js).
+  const STAT_VOCAB = ITEMS.map((i) => i.stats).join(" ");
   function statNotes(text, it) {
-    const skip = /^(required|durability|defense|item version|sell value|shift|one hand damage|two hand damage|throw damage|quantity|class|\(.*only\)|keep in inventory|socketed|ethereal)/i;
-    const runeLine = /^['‘’"]?([A-Z][a-z]{1,4}){2,6}['‘’"]?$/;
-    const lines = text.split(/\n+/).map((l) => l.trim()).filter((l) => l.length > 2);
-    const names = it ? [it.name.replace(/ \((sword|shield|helm|weapon)\)$/, ""), it.alias].filter(Boolean).map(norm) : [];
-    let nameIdx = lines.findIndex((l) => names.some((n) => sim(norm(l), n) >= 0.75));
-    const start = nameIdx >= 0 ? nameIdx + 2 : Math.min(2, Math.max(0, lines.length - 3)); // name + base type
-    return lines.slice(start).filter((l) => !skip.test(l) && !runeLine.test(l.replace(/\s/g, "")))
-      .slice(0, 14).join("\n").slice(0, 500);
+    const skip = new Set(it ? [it.name, it.alias].filter(Boolean).map((n) => n.toLowerCase()) : []);
+    return StatClean.cleanStats(text, STAT_VOCAB).filter((l) => !skip.has(l.toLowerCase())).slice(0, 16).join("\n");
   }
 
   function destinations(c, it) {
