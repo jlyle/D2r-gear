@@ -449,7 +449,7 @@
   // ---------- item search ----------
   const SLOT_NAME = { helm: "Helm", armor: "Armor", weapon: "Weapon", offhand: "Shield / off-hand", gloves: "Gloves", belt: "Belt", boots: "Boots", amulet: "Amulet", ring: "Ring", charm: "Charm", rune: "Rune", gem: "Gem", jewel: "Jewel", misc: "Other" };
   const sNorm = (s) => String(s || "").toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim();
-  const indexEntry = (it) => ({ it, hay: sNorm([it.name, it.alias, it.runes, it.cls].filter(Boolean).join(" ")), name: sNorm(it.name) });
+  const indexEntry = (it) => ({ it, hay: sNorm([it.name, it.alias, it.runes, it.cls, it.base, it.set].filter(Boolean).join(" ")), name: sNorm(it.name) });
   const SEARCH_INDEX = ITEMS.map(indexEntry);
   // Rank: name starts with query > a word starts with it > contains it anywhere (incl. alias, runes).
   function searchItems(q, filter, limit = 8) {
@@ -493,7 +493,7 @@
     if (!it) return opts.empty ? `<div class="tip empty-tip">${opts.empty}</div>` : "";
     const mine = noteLines(entry.note);
     const typical = statLines(it.stats);
-    const sub = [it.custom ? "Custom" : "", TYPE_LABEL[it.type], SLOT_NAME[it.slot] && it.custom ? SLOT_NAME[it.slot] : "", it.req ? `lvl ${it.req}` : "", it.cls ? `${it.cls} only` : ""].filter(Boolean).join(" · ");
+    const sub = [it.custom ? "Custom" : "", TYPE_LABEL[it.type], it.base || (it.custom ? SLOT_NAME[it.slot] : ""), it.set ? `${it.set} set` : "", it.req ? `lvl ${it.req}` : "", it.cls ? `${it.cls} only` : ""].filter(Boolean).join(" · ");
     return `<div class="tip" data-entry="${opts.noteKey || ""}">
       <div class="tip-top">
         ${itemIcon(it)}

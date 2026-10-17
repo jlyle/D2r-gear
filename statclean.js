@@ -40,6 +40,7 @@
     [new RegExp(N + "\\s*%?\\s*to enemy " + ELEM + " resistance"), (m) => `${neg(m[1])}% to Enemy ${SK(m[2])} Resistance`],
     [new RegExp(N + "\\s*%?\\s*to " + ELEM + " skill damage"), (m) => `${sign(m[1])}% to ${SK(m[2])} Skill Damage`],
     [new RegExp("adds (\\d{1,4})\\s*-\\s*(\\d{1,4}) " + ELEM + " damage"), (m) => `Adds ${m[1]}-${m[2]} ${SK(m[3])} Damage`],
+    [/adds (\d{1,4})\s*-\s*(\d{1,4}) damage/, (m) => `Adds ${m[1]}-${m[2]} Damage`],
     [new RegExp("maximum " + ELEM + " resist\\s*" + N), (m) => `Maximum ${SK(m[1])} Resist ${sign(m[2])}%`],
     [new RegExp(ELEM + " resist\\s*" + N), (m) => `${SK(m[1])} Resist ${sign(m[2])}%`],
     [/all resistances\s*([+\-]?\d{1,3})/, (m) => `All Resistances ${sign(m[1])}`],

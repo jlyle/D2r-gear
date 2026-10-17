@@ -87,9 +87,17 @@
   };
   const BY_SLOT = { helm: "helm", weapon: "sword", offhand: "shield", armor: "plate", gloves: "gloves", belt: "belt", boots: "boots", amulet: "amulet", ring: "ring", rune: "rune", gem: "gem", jewel: "jewel", misc: "misc" };
 
+  // Game base-type codes (from the item catalog) → icon.
+  const BY_BTYPE = {
+    knif: "dagger", tkni: "dagger", swor: "sword", axe: "axe", taxe: "axe", club: "mace", scep: "mace", mace: "mace", hamm: "hammer",
+    staf: "staff", wand: "wand", orb: "orb", bow: "bow", abow: "bow", xbow: "crossbow", jave: "javelin", ajav: "javelin",
+    spea: "spear", aspe: "spear", pole: "polearm", h2h: "claw", h2h2: "claw",
+    helm: "helm", circ: "circlet", pelt: "pelt", phlm: "horned", head: "head", ashd: "holy", shie: "shield", grim: "tome",
+    tors: "plate", glov: "gloves", belt: "belt", boot: "boots", amul: "amulet", ring: "ring", scha: "small", mcha: "large", lcha: "grand",
+  };
   function key(it) {
-    if (it.slot === "charm") return it.size === 1 ? "small" : it.size === 2 ? "large" : "grand";
-    return BY_NAME[it.name] || BY_SLOT[it.slot] || "grand";
+    if (it.slot === "charm") return it.size === 1 ? "small" : it.size === 2 ? "large" : it.size === 3 ? "grand" : BY_BTYPE[it.btype] || "grand";
+    return BY_NAME[it.name] || BY_BTYPE[it.btype] || BY_SLOT[it.slot] || "misc";
   }
   function svg(it) {
     return `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">${P[key(it)]}</svg>`;
