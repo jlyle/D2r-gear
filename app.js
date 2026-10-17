@@ -419,6 +419,46 @@
   // Original line icons per item class (icons.js), tinted by item rarity.
   const itemIcon = (it) => `<span class="item-ico n-${it.type}" aria-hidden="true">${ItemIcons.svg(it)}</span>`;
 
+  // ---------- item search ----------
+  const SLOT_NAME = { helm: "Helm", armor: "Armor", weapon: "Weapon", offhand: "Shield / off-hand", gloves: "Gloves", belt: "Belt", boots: "Boots", amulet: "Amulet", ring: "Ring", charm: "Charm" };
+  const sNorm = (s) => String(s || "").toLowerCase().replace(/[’']/g, "").replace(/[^a-z0-9]+/g, " ").trim();
+  const SEARCH_INDEX = ITEMS.map((it) => ({ it, hay: sNorm([it.name, it.alias, it.runes, it.cls].filter(Boolean).join(" ")), name: sNorm(it.name) }));
+  // Rank: name starts with query > a word starts with it > contains it anywhere (incl. alias, runes).
+  function searchItems(q, filter, limit = 8) {
+    const n = sNorm(q);
+    if (!n) return [];
+    const words = n.split(" ");
+    // Each typed word must start a word in the item's name/alias/runes; fall back to anywhere-in-text.
+    const collect = (test) => {
+      const out = [];
+      for (const e of SEARCH_INDEX) {
+        if (filter && !filter(e.it)) continue;
+        if (!words.every((w) => test(e.hay, w))) continue;
+        out.push({ it: e.it, score: e.name.startsWith(n) ? 0 : 1 });
+      }
+      return out;
+    };
+    let out = collect((hay, w) => (" " + hay).includes(" " + w));
+    if (!out.length) out = collect((hay, w) => hay.includes(w));
+    return out.sort((a, z) => a.score - z.score || a.it.name.localeCompare(z.it.name)).slice(0, limit).map((x) => x.it);
+  }
+  const searchHTML = (placeholder) => `<div class="isearch"><input type="search" class="isearch-in" placeholder="🔍 ${esc(placeholder)}" autocomplete="off" enterkeyhint="search"><ul class="isearch-res" hidden></ul></div>`;
+  // Wire a search box: filter(it) limits results, onPick(it) handles the choice.
+  function wireSearch(box, filter, onPick, ctx) {
+    if (!box) return;
+    const inp = $(".isearch-in", box), res = $(".isearch-res", box);
+    const show = () => {
+      const hits = searchItems(inp.value, filter);
+      res.hidden = !inp.value.trim();
+      res.innerHTML = hits.length
+        ? hits.map((it) => `<li><button type="button" data-name="${esc(it.name)}">${itemIcon(it)}<span><span class="n-${it.type}">${esc(it.name)}</span><small>${esc([SLOT_NAME[it.slot], TYPE_LABEL[it.type], it.cls ? it.cls + " only" : ""].filter(Boolean).join(" · "))}</small></span></button></li>`).join("")
+        : `<li class="none">No items match "${esc(inp.value)}"</li>`;
+      res.querySelectorAll("button").forEach((b) => (b.onclick = () => { inp.value = ""; res.hidden = true; onPick(byName.get(b.dataset.name)); }));
+    };
+    inp.oninput = show;
+    inp.onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); $("button", res)?.click(); } if (e.key === "Escape") { inp.value = ""; res.hidden = true; } };
+  }
+
   // Tooltip-style item block: icon, typical stats, then your item's actual stats.
   // opts.noteKey marks the entry for wiring (see wireEntries).
   function entryHTML(entry, it, opts = {}) {
@@ -490,6 +530,7 @@
       const it = byName.get(g.item);
       return `<div class="card slot" data-slot="${s.key}">
         <h3><span>${s.label}</span>${tierBadge(c, s.key, g.item)}</h3>
+        ${searchHTML(`Search ${s.label.toLowerCase()}…`)}
         <select class="pick" aria-label="${s.label}">${itemOptions(c, s, g.item)}</select>
         ${entryHTML(g, it, { noteKey: s.key })}
       </div>`;
@@ -502,6 +543,11 @@
         c.gear[key] = e.target.value ? { item: e.target.value, note: "" } : {};
         save(); render();
       };
+      const slot = slots.find((s) => s.key === key);
+      wireSearch($(".isearch", el), (it) => slotsFor(c, it).some((s) => s.key === key), (it) => {
+        if (c.gear[key]?.item !== it.name) c.gear[key] = { item: it.name, note: "" };
+        save(); render();
+      });
     });
     wireEntries(body, (k) => c.gear[k]);
   }
@@ -624,6 +670,7 @@
         <p class="notes" style="margin-top:4px">Items here are shared by all your characters. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash.</p>
         <div class="add-row">
           <div class="stack add-pick">
+            ${searchHTML("Search any item…")}
             <label class="field"><span>Gear type</span><select id="addStashType">${GEAR_TYPES.map(([g, l]) => `<option value="${g}" ${g === stashType ? "selected" : ""}>${l}</option>`).join("")}</select></label>
             <label class="field"><span>Item</span><select id="addStash">${itemsOfType(c, stashType)}</select></label>
           </div>
@@ -632,6 +679,13 @@
       </div>
       <div class="card" style="margin-top:12px">${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
     $("#addStashType").onchange = (ev) => { stashType = ev.target.value; $("#addStash").innerHTML = itemsOfType(c, stashType); };
+    wireSearch($(".add-pick .isearch", body), null, (it) => {
+      stashType = it.slot;
+      $("#addStashType").value = stashType;
+      $("#addStash").innerHTML = itemsOfType(c, stashType);
+      $("#addStash").value = it.name;
+      $("#addStashBtn").focus();
+    });
     $("#addStashBtn").onclick = () => { state.stash.push({ id: uid(), item: $("#addStash").value, note: "" }); save(); render(); };
     body.querySelectorAll(".charm-row").forEach((row) => {
       const e = state.stash.find((x) => x.id === row.dataset.id);
@@ -898,6 +952,7 @@
           <label class="cand"><input type="radio" name="cand" value=""> Something else…</label></div></div>`
           : `<p class="err">Couldn't recognise the item name. Pick it below — retaking the photo closer and straight on usually helps.</p>`}
         <div id="otherWrap" class="stack" ${cands.length ? "hidden" : ""}>
+          ${searchHTML("Search any item…")}
           <label class="field"><span>Gear type</span><select id="scanType">${typeOpts}</select></label>
           <label class="field"><span>Item</span><select id="scanOther"></select></label>
         </div>
@@ -932,6 +987,12 @@
       $("#scanType").value = guessType(c, text, cands);
       $("#scanOther").innerHTML = itemsOfType(c, $("#scanType").value);
       $("#scanType").onchange = () => { $("#scanOther").innerHTML = itemsOfType(c, $("#scanType").value); refresh(true); };
+      wireSearch($("#otherWrap .isearch", d), null, (it) => {
+        $("#scanType").value = it.slot;
+        $("#scanOther").innerHTML = itemsOfType(c, it.slot);
+        $("#scanOther").value = it.name;
+        refresh(true);
+      });
       $("#scanDest").onchange = refreshMove;
       refresh(true);
       d.showModal();

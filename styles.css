@@ -218,3 +218,19 @@ dialog h2 { font-size: 18px; }
 .item-ico svg { width: 36px; height: 36px; }
 .add-row:has(.add-pick) { align-items: end; }
 .add-pick { margin-top: 0; }
+
+/* item search */
+.isearch { position: relative; margin-bottom: 8px; }
+.isearch-in { width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; min-height: 40px; }
+.isearch-in:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.isearch-res {
+  list-style: none; margin: 4px 0 0; padding: 4px; position: absolute; left: 0; right: 0; z-index: 30;
+  background: var(--panel); border: 1px solid var(--accent); border-radius: 8px; box-shadow: 0 10px 28px rgba(0,0,0,.6);
+  max-height: 340px; overflow-y: auto;
+}
+.isearch-res button { display: flex; gap: 10px; align-items: center; width: 100%; text-align: left; background: none; border: 0; padding: 6px; border-radius: 6px; cursor: pointer; }
+.isearch-res button:hover, .isearch-res button:focus { background: var(--panel-2); outline: none; }
+.isearch-res .item-ico { width: 36px; height: 36px; }
+.isearch-res .item-ico svg { width: 26px; height: 26px; }
+.isearch-res small { display: block; color: var(--muted); font-size: 12px; }
+.isearch-res .none { color: var(--muted); padding: 8px; font-size: 13px; }

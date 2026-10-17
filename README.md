@@ -7,7 +7,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 ## Features
 - Password-protected accounts, each with up to 10 characters and its own shared stash. Data is encrypted (AES-GCM, PBKDF2 key) and stored in the browser only; a forgotten password can't be recovered.
 - Export account backup (still encrypted) / Import to move an account between devices
-- Slot-by-slot gear picker with uniques, sets, runewords and common rare/crafted types
+- Slot-by-slot gear picker with uniques, sets, runewords and common rare/crafted types, plus item search (name, nickname or rune recipe)
 - Mercenary weapon, helm and armor
 - Charm inventory with 10×4 cell usage and duplicate-unique warnings
 - Shared stash (all characters): flags stash items that upgrade the current character, one-tap Equip that swaps the worn item back to stash
