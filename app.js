@@ -889,11 +889,51 @@
     return (pool.find((s) => !c.gear[s.key]?.item) || pool[0])?.key || "stash";
   }
 
+  const GEAR_TYPES = [["helm", "Helm"], ["armor", "Armor"], ["weapon", "Weapon"], ["offhand", "Shield / off-hand"], ["gloves", "Gloves"], ["belt", "Belt"], ["boots", "Boots"], ["amulet", "Amulet"], ["ring", "Ring"], ["charm", "Charm"]];
+  const TYPE_WORDS = [
+    ["charm", /\b(small|large|grand) charm\b/], ["ring", /\bring\b/], ["amulet", /\bamulet\b/],
+    ["helm", /\b(helm|cap|crown|mask|circlet|coronet|tiara|diadem|shako|pelt|hawk|antlers|totem|wolf head|spirit mask|demonhead|death mask|bone visage|sallet|casque|armet)\b/],
+    ["boots", /\b(boots|greaves|shoes|treads)\b/], ["belt", /\b(belt|sash|girdle|coil)\b/],
+    ["gloves", /\b(gloves|gauntlets|vambraces|bracers)\b/],
+    ["offhand", /\b(shield|monarch|targe|aegis|ward|pavise|buckler|grimoire|tome|codex|compendium|text|trophy|preserved head|zombie head)\b/],
+    ["armor", /\b(armor|plate|mail|robe|wyrmhide|dusk shroud|sacred armor|archon plate|mage plate|hellforge|shroud|cuirass|breast plate)\b/],
+    ["weapon", /\b(sword|blade|axe|mace|hammer|maul|flail|scepter|staff|wand|orb|bow|crossbow|javelin|spear|pike|polearm|claw|katar|dagger|kris|knife|scythe|thresher|war pike)\b/],
+  ];
+  // Pre-pick the gear type: best candidate, else base-type words, else the current tab.
+  function guessType(c, text, cands) {
+    if (cands[0]) return cands[0].it.slot;
+    const t = text.toLowerCase();
+    for (const [g, re] of TYPE_WORDS) if (re.test(t)) return g;
+    return tab === "charms" ? "charm" : "helm";
+  }
+  // Items of one gear type: this build's picks first, then by kind; other classes last.
+  function itemsOfType(c, type) {
+    const b = buildOf(c);
+    const list = ITEMS.filter((i) => i.slot === type);
+    const mine = list.filter((i) => !i.cls || i.cls === c.cls);
+    const others = list.filter((i) => i.cls && i.cls !== c.cls);
+    const opt = (i) => `<option value="${esc(i.name)}">${esc(i.name)}${i.alias ? ` (${esc(i.alias)})` : ""}${i.cls && i.cls !== c.cls ? ` — ${i.cls}` : ""}</option>`;
+    const rec = new Set();
+    if (b) {
+      const keys = type === "ring" ? ["ring"] : type === "charm" ? [] : [type, ...(type === "weapon" ? ["swap", "merc_weapon"] : type === "helm" ? ["merc_helm"] : type === "armor" ? ["merc_armor"] : [])];
+      keys.forEach((k) => (b.tiers[k] || []).flat().forEach((n) => rec.add(n)));
+      if (type === "charm") b.charms.forEach((n) => rec.add(n));
+    }
+    const recItems = mine.filter((i) => rec.has(i.name));
+    let html = recItems.length ? `<optgroup label="Recommended for ${esc(b.name)}">${recItems.map(opt).join("")}</optgroup>` : "";
+    for (const [k, l] of [["unique", "Uniques"], ["set", "Set items"], ["runeword", "Runewords"], ["rare", "Rare / crafted / magic"], ["charm", "Charms"]]) {
+      const g = mine.filter((i) => i.type === k && !rec.has(i.name)).sort((x, y) => x.name.localeCompare(y.name));
+      if (g.length) html += `<optgroup label="${l}">${g.map(opt).join("")}</optgroup>`;
+    }
+    if (others.length) html += `<optgroup label="Other classes">${others.map(opt).join("")}</optgroup>`;
+    return html;
+  }
+
   function reviewDialog(c, file, text, cands, idx, total) {
     return new Promise((resolve) => {
       const d = $("#scanDialog");
       const url = URL.createObjectURL(file);
-      const allOpts = Object.keys(SLOT_LABELS).map((g) => `<optgroup label="${SLOT_LABELS[g]}">${ITEMS.filter((i) => i.slot === g).map((i) => `<option value="${esc(i.name)}">${esc(i.name)}</option>`).join("")}</optgroup>`).join("");
+      const typeOpts = GEAR_TYPES.map(([g, l]) => `<option value="${g}">${l}</option>`).join("");
       d.innerHTML = `<form method="dialog" class="stack">
         <h2>Photo ${idx + 1} of ${total}</h2>
         <img class="scan-thumb" src="${url}" alt="Your photo">
@@ -901,7 +941,10 @@
           <div class="cands">${cands.map((x, i) => `<label class="cand"><input type="radio" name="cand" value="${esc(x.it.name)}" ${i === 0 ? "checked" : ""}> ${itemLine(x.it)} <span class="runes">${x.guess ? "best guess from base type" : Math.round(Math.min(1, x.score) * 100) + "% match"}</span></label>`).join("")}
           <label class="cand"><input type="radio" name="cand" value=""> Something else…</label></div></div>`
           : `<p class="err">Couldn't recognise the item name. Pick it below — retaking the photo closer and straight on usually helps.</p>`}
-        <label class="field" id="otherWrap" ${cands.length ? "hidden" : ""}><span>Item</span><select id="scanOther">${allOpts}</select></label>
+        <div id="otherWrap" class="stack" ${cands.length ? "hidden" : ""}>
+          <label class="field"><span>Gear type</span><select id="scanType">${typeOpts}</select></label>
+          <label class="field"><span>Item</span><select id="scanOther"></select></label>
+        </div>
         <label class="field"><span>Put it in</span><select id="scanDest"></select></label>
         <label class="check" id="moveWrap"><input type="checkbox" id="scanMove" checked> Move the replaced item to the shared stash</label>
         <label class="check"><input type="checkbox" id="scanKeep" checked> Keep this photo with the item</label>
@@ -931,6 +974,9 @@
       };
       d.querySelectorAll('input[name="cand"]').forEach((r) => (r.onchange = () => refresh(true)));
       $("#scanOther").onchange = () => refresh(true);
+      $("#scanType").value = guessType(c, text, cands);
+      $("#scanOther").innerHTML = itemsOfType(c, $("#scanType").value);
+      $("#scanType").onchange = () => { $("#scanOther").innerHTML = itemsOfType(c, $("#scanType").value); refresh(true); };
       $("#scanDest").onchange = refreshMove;
       refresh(true);
       d.showModal();
