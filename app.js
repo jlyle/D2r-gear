@@ -28,6 +28,7 @@
   let state = null;   // decrypted { chars, stash, current } of the unlocked account
   let tab = "gear";
   let pickedAcct = null;
+  let stashType = "helm"; // last gear type used when adding to the stash
 
   function loadAccounts() {
     try { return JSON.parse(localStorage.getItem(ACCTS_KEY)) || []; } catch (e) { return []; }
@@ -595,10 +596,7 @@
 
   function renderStash(body, c) {
     const groups = Object.keys(SLOT_LABELS);
-    const picker = groups.map((g) => {
-      const list = ITEMS.filter((i) => i.slot === g).sort((a, z) => a.name.localeCompare(z.name));
-      return `<optgroup label="${SLOT_LABELS[g]}">${list.map((i) => `<option value="${esc(i.name)}">${esc(i.name)}${i.cls ? ` (${i.cls})` : ""}</option>`).join("")}</optgroup>`;
-    }).join("");
+    if (!GEAR_TYPES.some(([g]) => g === stashType)) stashType = "helm";
     const ups = new Map(stashUpgrades(c).map((u) => [u.entry.id, u]));
     const sections = groups.map((g) => {
       const entries = state.stash.filter((e) => byName.get(e.item)?.slot === g);
@@ -625,11 +623,15 @@
         <h3>Shared stash</h3>
         <p class="notes" style="margin-top:4px">Items here are shared by all your characters. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash.</p>
         <div class="add-row">
-          <select id="addStash">${picker}</select>
+          <div class="stack add-pick">
+            <label class="field"><span>Gear type</span><select id="addStashType">${GEAR_TYPES.map(([g, l]) => `<option value="${g}" ${g === stashType ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+            <label class="field"><span>Item</span><select id="addStash">${itemsOfType(c, stashType)}</select></label>
+          </div>
           <button class="btn" id="addStashBtn">Add</button>
         </div>
       </div>
       <div class="card" style="margin-top:12px">${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
+    $("#addStashType").onchange = (ev) => { stashType = ev.target.value; $("#addStash").innerHTML = itemsOfType(c, stashType); };
     $("#addStashBtn").onclick = () => { state.stash.push({ id: uid(), item: $("#addStash").value, note: "" }); save(); render(); };
     body.querySelectorAll(".charm-row").forEach((row) => {
       const e = state.stash.find((x) => x.id === row.dataset.id);

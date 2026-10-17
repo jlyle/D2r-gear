@@ -216,3 +216,5 @@ dialog h2 { font-size: 18px; }
 .tip-stats.mine li { color: #c9d0ff; }
 .item-ico { flex: none; width: 52px; height: 52px; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: radial-gradient(circle at 50% 40%, rgba(255,255,255,.06), transparent 70%), #070606; }
 .item-ico svg { width: 36px; height: 36px; }
+.add-row:has(.add-pick) { align-items: end; }
+.add-pick { margin-top: 0; }
