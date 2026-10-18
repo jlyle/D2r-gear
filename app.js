@@ -645,7 +645,11 @@
         <h3>Inventory space</h3>
         <div class="inv">${cells}</div>
         <div class="kept-row">${KEPT.map((k) => `<label class="kept"><input type="checkbox" data-kept="${k.key}" ${keptOn(c, k.key) ? "checked" : ""}> ${k.label} <span class="runes">${k.size} cells</span></label>`).join("")}</div>
-        <div class="notes">${used} of ${INV_CELLS} cells used: ${charmsUsed} by charms${kept ? `, ${kept} by tomes &amp; cube` : ""}${used > INV_CELLS ? ` — <b style="color:var(--bad)">over capacity</b>` : `, ${INV_CELLS - used} free for loot`}.
+        <div class="notes">${(() => {
+          const n = { 3: 0, 2: 0, 1: 0 };
+          c.charms.forEach((ch) => { const z = byName.get(ch.item)?.size || 1; n[z] = (n[z] || 0) + 1; });
+          return `Charms: ${n[3]} grand · ${n[2]} large · ${n[1]} small`;
+        })()}<br>${used} of ${INV_CELLS} cells used: ${charmsUsed} by charms${kept ? `, ${kept} by tomes &amp; cube` : ""}${used > INV_CELLS ? ` — <b style="color:var(--bad)">over capacity</b>` : `, ${INV_CELLS - used} free for loot`}.
         ${dupes.length ? `<br><b style="color:var(--bad)">Only one of each can be active:</b> ${dupes.map(esc).join(", ")}` : ""}</div>
       </div>
       <div class="card" style="margin-top:12px">
