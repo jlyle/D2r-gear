@@ -172,6 +172,10 @@ dialog h2 { font-size: 18px; }
 .inv { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; margin: 10px 0; }
 .inv i { aspect-ratio: 1; border-radius: 3px; background: var(--panel-2); border: 1px solid var(--line); }
 .inv i.f { background: rgba(122,162,255,.35); border-color: var(--charm); }
+.inv i.k { background: rgba(200,162,82,.3); border-color: var(--accent); }
+.kept-row { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 4px 0 6px; }
+.kept { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; cursor: pointer; }
+.kept input { accent-color: var(--accent); width: 18px; height: 18px; }
 .inv i.over { background: rgba(214,90,74,.4); border-color: var(--bad); }
 
 .charm-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }

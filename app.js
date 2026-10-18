@@ -215,9 +215,16 @@
     return total;
   }
 
-  function cellsUsed(c) {
-    return c.charms.reduce((n, ch) => n + (byName.get(ch.item)?.size || 1), 0);
-  }
+  // Items kept in the inventory besides charms (all on unless turned off for this character).
+  const KEPT = [
+    { key: "id", label: "Tome of Identify", size: 2 },
+    { key: "tp", label: "Tome of Town Portal", size: 2 },
+    { key: "cube", label: "Horadric Cube", size: 4 },
+  ];
+  const keptOn = (c, k) => !(c.kept && c.kept[k] === false);
+  const keptCells = (c) => KEPT.reduce((n, k) => n + (keptOn(c, k.key) ? k.size : 0), 0);
+  const charmCells = (c) => c.charms.reduce((n, ch) => n + (byName.get(ch.item)?.size || 1), 0);
+  function cellsUsed(c) { return keptCells(c) + charmCells(c); }
 
   // ---------- render ----------
   function render() {
@@ -631,12 +638,14 @@
     c.charms.forEach((ch) => (counts[ch.item] = (counts[ch.item] || 0) + 1));
     const dupes = Object.keys(counts).filter((n) => byName.get(n)?.unique1 && counts[n] > 1);
     let cells = "";
-    for (let i = 0; i < Math.max(INV_CELLS, used); i++) cells += `<i class="${i < used ? (i >= INV_CELLS ? "over" : "f") : ""}"></i>`;
+    const kept = keptCells(c), charmsUsed = used - kept;
+    for (let i = 0; i < Math.max(INV_CELLS, used); i++) cells += `<i class="${i >= INV_CELLS ? "over" : i < kept ? "k" : i < used ? "f" : ""}"></i>`;
     body.innerHTML = `
       <div class="card">
         <h3>Inventory space</h3>
         <div class="inv">${cells}</div>
-        <div class="notes">${used} of ${INV_CELLS} cells used by charms${used > INV_CELLS ? ` — <b style="color:var(--bad)">over capacity</b>` : `, ${INV_CELLS - used} free for loot`}.
+        <div class="kept-row">${KEPT.map((k) => `<label class="kept"><input type="checkbox" data-kept="${k.key}" ${keptOn(c, k.key) ? "checked" : ""}> ${k.label} <span class="runes">${k.size} cells</span></label>`).join("")}</div>
+        <div class="notes">${used} of ${INV_CELLS} cells used: ${charmsUsed} by charms${kept ? `, ${kept} by tomes &amp; cube` : ""}${used > INV_CELLS ? ` — <b style="color:var(--bad)">over capacity</b>` : `, ${INV_CELLS - used} free for loot`}.
         ${dupes.length ? `<br><b style="color:var(--bad)">Only one of each can be active:</b> ${dupes.map(esc).join(", ")}` : ""}</div>
       </div>
       <div class="card" style="margin-top:12px">
@@ -653,6 +662,9 @@
           <button class="btn" id="addCharmBtn">Add</button>
         </div>
       </div>`;
+    body.querySelectorAll("[data-kept]").forEach((cb) => (cb.onchange = () => {
+      c.kept = { ...(c.kept || {}), [cb.dataset.kept]: cb.checked }; save(); render();
+    }));
     $("#addCharmBtn").onclick = () => { const id = uid(); c.charms.push({ id, added: Date.now(), item: $("#addCharm").value, note: "" }); flashId = id; save(); render(); };
     body.querySelectorAll(".charm-row").forEach((row) => {
       const ch = c.charms.find((x) => x.id === row.dataset.id);
