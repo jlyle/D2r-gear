@@ -29,6 +29,7 @@
   let tab = "gear";
   let pickedAcct = null;
   let stashType = "helm"; // last gear type used when adding to the stash
+  let stashFind = ""; // filter text for the stash list (kept while you remove items)
   // Newest first: entries carry `added`; older ones without it keep their saved order.
   const newestFirst = (list) => list.map((e, i) => ({ e, k: e.added || i })).sort((a, b) => b.k - a.k).map((x) => x.e);
   const latestAdded = (list) => list.reduce((m, e) => Math.max(m, e.added || 0), 0);
@@ -737,12 +738,13 @@
     const sections = orderedGroups.map((g) => {
       const entries = newestFirst(state.stash.filter((e) => byName.get(e.item)?.slot === g));
       if (!entries.length) return "";
-      return `<h3 class="grp">${SLOT_LABELS[g]}</h3>${entries.map((e) => {
+      return `<section class="sgrp"><h3 class="grp">${SLOT_LABELS[g]}</h3>${entries.map((e) => {
         const it = byName.get(e.item);
         const u = ups.get(e.id);
         const target = u ? u.slotKey : slotsFor(c, it)[0]?.key;
         const canEquip = it.slot === "charm" || target;
-        return `<div class="charm-row ${e.id === flashId ? "flash" : ""}" data-id="${e.id}">
+        const hay = [e.item, it.alias, it.runes, it.base, e.note, SLOT_LABELS[g]].filter(Boolean).join(" ").toLowerCase();
+        return `<div class="charm-row ${e.id === flashId ? "flash" : ""}" data-id="${e.id}" data-find="${esc(hay)}">
           <div>
             ${u ? `<div class="ok up-flag">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
             ${entryHTML(e, it, { noteKey: e.id })}
@@ -752,7 +754,7 @@
             <button class="btn ghost small rm" aria-label="Remove">✕</button>
           </div>
         </div>`;
-      }).join("")}`;
+      }).join("")}</section>`;
     }).join("");
     body.innerHTML = `
       <div class="card">
@@ -778,7 +780,26 @@
           </div>
         </details>
       </div>
-      <div class="card" style="margin-top:12px">${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
+      <div class="card" style="margin-top:12px">
+        ${state.stash.length ? `<label class="field stash-find"><span>Find in your stash (${state.stash.length} item${state.stash.length === 1 ? "" : "s"})</span>
+          <input type="search" id="stashFind" placeholder="Name, rune, base or stat…" value="${esc(stashFind)}" autocomplete="off"></label>
+          <p class="notes" id="stashNone" hidden>Nothing in your stash matches.</p>` : ""}
+        ${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
+    const applyFind = () => {
+      const q = stashFind.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      let shown = 0;
+      body.querySelectorAll(".sgrp").forEach((sec) => {
+        let n = 0;
+        sec.querySelectorAll(".charm-row").forEach((row) => {
+          const hit = q.every((w) => row.dataset.find.includes(w));
+          row.hidden = !hit; if (hit) n++;
+        });
+        sec.hidden = !n; shown += n;
+      });
+      const none = $("#stashNone", body); if (none) none.hidden = shown > 0 || !q.length;
+    };
+    const findBox = $("#stashFind", body);
+    if (findBox) { findBox.oninput = () => { stashFind = findBox.value; applyFind(); }; applyFind(); }
     $("#addStashType").onchange = (ev) => { stashType = ev.target.value; $("#addStash").innerHTML = itemsOfType(c, stashType); };
     wireSearch($(".add-pick .isearch", body), null, (it) => {
       stashType = it.slot;

@@ -34,7 +34,7 @@ button, select, input, textarea { font: inherit; color: inherit; }
 .roster { display: flex; gap: 8px; align-items: center; flex: 1; justify-content: flex-end; min-width: 260px; }
 .roster select { flex: 1; max-width: 280px; }
 
-select, input[type=text], input[type=number], input[type=password], textarea {
+select, input[type=text], input[type=number], input[type=password], input[type=search], textarea {
   background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
   padding: 8px 10px; min-height: 40px; width: 100%;
 }
@@ -181,6 +181,9 @@ dialog h2 { font-size: 18px; }
 .charm-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; padding: 10px 0; border-top: 1px solid var(--line); }
 .charm-row:first-child { border-top: 0; }
 .charm-row .note { margin-top: 6px; }
+.charm-row[hidden], .sgrp[hidden] { display: none; }
+.stash-find { margin-bottom: 8px; }
+.stash-find input { font-size: 16px; }
 .add-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
 
 .empty { text-align: center; padding: 40px 16px; }
