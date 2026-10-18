@@ -242,9 +242,9 @@
         <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option ${m === c.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
-        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
+        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
-      ${tab !== "upgrades" ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
+      ${!["upgrades", "skills"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
       <section id="tabBody"></section>`;
 
     $("#fName").oninput = (e) => { c.name = e.target.value; save(); renderRoster(); };
@@ -269,6 +269,7 @@
     else if (tab === "merc") renderSlots(body, c, MERC_SLOTS);
     else if (tab === "charms") renderCharms(body, c);
     else if (tab === "stash") renderStash(body, c);
+    else if (tab === "skills") renderSkills(body, c);
     else renderUpgrades(body, c);
   }
 
@@ -758,6 +759,45 @@
     });
     wireEntries(body, (k) => state.stash.find((x) => x.id === k));
     showFlash(body);
+  }
+
+  // ---------- skill plan ----------
+  const ptsMin = (p) => (p === "rest" ? 0 : Number(String(p).match(/\d+/)?.[0] || 0));
+  function renderSkills(body, c) {
+    const b = buildOf(c);
+    const plan = b && SKILL_PLANS[b.id];
+    if (!plan) { body.innerHTML = `<div class="card"><p class="notes">No skill plan for this build yet.</p></div>`; return; }
+    const lvl = Number(c.level) || 1;
+    const quest = lvl >= 75 ? 12 : lvl >= 40 ? 8 : lvl >= 8 ? 4 : 0; // Den of Evil, Radament, Izual ×3 difficulties (rough)
+    const have = Math.max(0, lvl - 1) + quest;
+    const fixed = plan.skills.reduce((n, [name, p]) => n + (name === "Prerequisites" ? 0 : ptsMin(p)), 0);
+    const rows = plan.skills.map(([name, p, note], i) => {
+      const n = ptsMin(p), w = p === "rest" ? 100 : Math.min(100, (n / 20) * 100);
+      return `<li class="sk-row ${name === "Prerequisites" ? "sk-pre" : ""}">
+        <span class="sk-n">${name === "Prerequisites" ? "•" : i}</span>
+        <div class="sk-main"><div class="sk-name">${esc(name)}</div>${note ? `<div class="sk-note">${esc(note)}</div>` : ""}
+          <div class="sk-bar"><i style="width:${w}%" class="${p === "rest" ? "rest" : ""}"></i></div></div>
+        <span class="sk-pts">${p === "rest" ? "rest" : esc(p)}</span>
+      </li>`;
+    }).join("");
+    const st = plan.stats;
+    body.innerHTML = `
+      <div class="card">
+        <h3>${esc(b.name)} — skill points</h3>
+        <p class="notes">Max them in this order. At level ${lvl} you have about <b>${have}</b> points (${Math.max(0, lvl - 1)} from levels + ${quest} from quests: Den of Evil, Radament and Izual in each difficulty). This plan places about ${fixed} points plus prerequisites; "rest" takes whatever is left.</p>
+        ${plan.note ? `<p class="notes" style="color:var(--text)">${esc(plan.note)}</p>` : ""}
+        <ol class="sk-list">${rows}</ol>
+        <p class="notes sk-src">${plan.src === "iv" ? "Matches the current Icy Veins skill guide for this build." : "Long-standing community allocation for this build — if a patch changed its synergies, check a current guide."} These are the points you spend yourself — +skills from gear add on top.</p>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Stat points</h3>
+        <dl class="stat-plan">
+          <dt>Strength</dt><dd>${esc(st.str)}</dd>
+          <dt>Dexterity</dt><dd>${esc(st.dex)}</dd>
+          <dt>Vitality</dt><dd>${esc(st.vit)}</dd>
+          <dt>Energy</dt><dd>${esc(st.enr)}</dd>
+        </dl>
+      </div>`;
   }
 
   function renderUpgrades(body, c) {

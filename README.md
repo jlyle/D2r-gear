@@ -15,6 +15,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 - Add gear from photos: snap item tooltips, on-device OCR (Tesseract.js) matches the item, pre-picks the slot and fills in your rolls
 - Photos are only used to read stats and are never stored; items show original gear-type icons tinted by rarity
 - Tooltip-style item display: typical stats, a divider, then the item's actual stats; per-item Scan stats from a photo
+- Skills tab: suggested skill point order and amounts plus stat points for all 40 builds
 - Upgrades tab: stash upgrades first, then per-slot suggestions with Traderie links, FCR breakpoint check for caster builds, missing charms
 
 ## Editing data

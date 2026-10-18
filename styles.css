@@ -247,3 +247,19 @@ dialog h2 { font-size: 18px; }
 .chk { margin-left: 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; border: 1px solid var(--warn); border-radius: 99px; padding: 0 6px; vertical-align: 1px; }
 .charm-row.flash .tip { animation: flash 2.2s ease-out; }
 @keyframes flash { 0%, 30% { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); } 100% { box-shadow: 0 0 0 0 transparent; } }
+
+/* skill plan */
+.sk-list { list-style: none; padding: 0; margin: 12px 0 0; display: grid; gap: 6px; }
+.sk-row { display: grid; grid-template-columns: 26px 1fr auto; gap: 10px; align-items: center; background: var(--panel-2); border-radius: 8px; padding: 8px 10px; }
+.sk-row.sk-pre { background: transparent; border: 1px dashed var(--line); }
+.sk-n { font: 700 14px Cinzel, serif; color: var(--accent); text-align: center; }
+.sk-name { font-weight: 600; }
+.sk-note { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.sk-bar { height: 4px; background: rgba(255,255,255,.06); border-radius: 99px; margin-top: 6px; overflow: hidden; }
+.sk-bar i { display: block; height: 100%; background: var(--accent); }
+.sk-bar i.rest { background: repeating-linear-gradient(90deg, var(--accent) 0 6px, transparent 6px 10px); opacity: .6; }
+.sk-pts { font: 700 16px Cinzel, serif; color: var(--text); min-width: 40px; text-align: right; }
+.sk-src { margin-top: 12px; font-size: 12px; }
+.stat-plan { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 10px 0 0; }
+.stat-plan dt { font-weight: 600; color: var(--accent); }
+.stat-plan dd { margin: 0; color: var(--text); }
