@@ -566,9 +566,9 @@
       try {
         const worker = await getWorker(progress);
         progress("Reading stats from photo…");
-        const { data } = await worker.recognize(await prepImage(file));
+        const text = await readPhoto(worker, file);
         status.hidden = true;
-        const lines = statNotes(data.text || "", byName.get(en.item));
+        const lines = statNotes(text, byName.get(en.item));
         if (!lines) { alert("Couldn't find any stat lines in that photo. Try again straight on, closer to the tooltip."); return; }
         if (!en.note || confirm(`Replace the actual stats with these?\n\n${lines}`)) { en.note = lines; save(); render(); }
       } catch (err) { status.hidden = true; alert("Couldn't read the photo — the text reader needs an internet connection the first time it loads."); }
@@ -926,12 +926,19 @@
       logger: (m) => { if (m.status === "recognizing text") progress(`Reading text… ${Math.round(m.progress * 100)}%`); },
     });
     // Only characters that appear in tooltips — cuts most of the noise.
-    await ocrWorker.setParameters({ tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-%.,:()'/ Øø" });
+    await ocrWorker.setParameters({ tessedit_pageseg_mode: "6", tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+-%.,:()'/ Øø" });
     return ocrWorker;
   }
 
   // Grayscale, invert (tooltips are light text on black) and stretch contrast.
-  async function prepImage(file) {
+  // Two readings of each photo, combined: the usual one (good for gold/green item names) and one that
+  // keeps only the game's blue and white text, which survives see-through tooltips over busy backgrounds.
+  async function readPhoto(worker, file) {
+    const a = (await worker.recognize(await prepImage(file))).data.text || "";
+    const b = (await worker.recognize(await prepImage(file, "text"))).data.text || "";
+    return a + "\n" + b;
+  }
+  async function prepImage(file, mode) {
     const bmp = await createImageBitmap(file);
     const scale = Math.min(1, 2000 / Math.max(bmp.width, bmp.height));
     const w = Math.round(bmp.width * scale), h = Math.round(bmp.height * scale);
@@ -940,6 +947,15 @@
     const ctx = cv.getContext("2d");
     ctx.drawImage(bmp, 0, 0, w, h);
     const img = ctx.getImageData(0, 0, w, h), d = img.data;
+    if (mode === "text") {
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2], mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+        const text = (b > 140 && b - Math.max(r, g) > 45) || (mn > 165 && mx - mn < 45); // magic blue or white
+        d[i] = d[i + 1] = d[i + 2] = text ? 0 : 255;
+      }
+      ctx.putImageData(img, 0, 0);
+      return cv;
+    }
     // Brightest channel, so blue magic-property text stays as strong as white and gold text.
     for (let i = 0; i < d.length; i += 4) {
       const g = Math.max(d[i], d[i + 1], d[i + 2]);
@@ -1025,7 +1041,13 @@
     const lines = known ? StatClean.cleanStatsForItem(text, it.stats)
       : affix ? StatClean.cleanStatsForItem(text, affix, true)
       : StatClean.cleanStats(text, STAT_VOCAB);
-    return lines.filter((l) => !skip.has(l.toLowerCase())).slice(0, 18).join("\n");
+    // The photo is read twice, so the general parser can see a stat twice: keep the first of each kind.
+    const seen = new Set();
+    return lines.filter((l) => {
+      const k = l.toLowerCase().replace(/[+\-]?\d+(?:\.\d+)?/g, "#");
+      if (skip.has(l.toLowerCase()) || seen.has(k)) return false;
+      seen.add(k); return true;
+    }).slice(0, 18).join("\n");
   }
 
   function destinations(c, it) {
@@ -1181,10 +1203,9 @@
       const worker = await getWorker(progress);
       for (let i = 0; i < files.length; i++) {
         progress(`Reading photo ${i + 1} of ${files.length}…`);
-        const canvas = await prepImage(files[i]);
-        const { data } = await worker.recognize(canvas);
+        const text = await readPhoto(worker, files[i]);
         status.hidden = true;
-        const res = await reviewDialog(c, files[i], data.text || "", matchItems(data.text || ""), i, files.length);
+        const res = await reviewDialog(c, files[i], text, matchItems(text), i, files.length);
         if (res === "stop") break;
         if (res !== "skip") { await applyScan(c, res, files[i]); added++; render(); }
       }
