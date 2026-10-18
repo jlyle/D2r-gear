@@ -287,6 +287,7 @@
   let readmeHtml = null; // null = not fetched yet, "" = unavailable
   let readmeOpen = null; // user's expand/collapse choice; null = open only when there are no accounts yet
   const mdInline = (t) => esc(t)
+    .replace(/!\[([^\]]*)\]\(([^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener"><img src="$2" alt="$1" loading="lazy"></a>')
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
     .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
