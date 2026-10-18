@@ -232,6 +232,12 @@
   }
   function fillTemplate(tpl, nums) {
     // "Adds 15-35 Damage" / "5-30 fire damage": min and max are separate fixed numbers.
+    // Magic affix form "Adds 1-2 to 2-4 Cold Damage": the tooltip shows "Adds 1-4 Cold Damage".
+    const ad = tpl.match(/^adds [\d-]+ to [\d-]+ (.+)$/i);
+    if (ad) {
+      const i = nums.findIndex((n, j) => j + 1 < nums.length && n <= nums[j + 1]);
+      return i >= 0 ? `Adds ${nums[i]}-${nums[i + 1]} ${ad[1]}` : `${tpl} (check)`;
+    }
     if (/^adds\b|\bto \d+ \w+ damage/i.test(tpl)) {
       const m = tpl.match(/(\d+)\s*(?:-|to)\s*(\d+)/);
       if (m && nums.length >= 2) {
@@ -318,13 +324,21 @@
         const p = pick(pre, false), q = /^o\w? /.test(suf) ? pick(suf.replace(/^o\w? /, "of "), true) : null;
         if (p) out.push(p);
         if (q) out.push(q);
-        if (out.length) return out.join(", ");
+        if (!out.length) continue;
+        // Half the name unread (e.g. only "of Good Luck"): any of the other half's stats may be on it.
+        const optional = [];
+        if (!p) for (const [n, v] of Object.entries(table)) if (!/^of /.test(n)) optional.push(...splitStats(v));
+        if (!q && /^o\w? /.test(suf) || !q && !suf) for (const [n, v] of Object.entries(table)) if (/^of /.test(n)) optional.push(...splitStats(v));
+        const res = out.join(", ");
+        return Object.assign(new String(res), { optional: [...new Set(optional)].filter((o) => !res.includes(o)) });
       }
     }
     return null;
   }
+  const splitStats = (str) => String(str || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter(Boolean);
   function cleanStatsForItem(text, itemStats, trusted) {
-    const allTpls = String(itemStats || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter(Boolean);
+    const allTpls = splitStats(itemStats);
+    const optional = (itemStats && itemStats.optional) || [];
     const perLevel = allTpls.filter((t) => /per character level/.test(t));
     const randomTpls = allTpls.filter((t) => /to a random \w+ skill/i.test(t));
     const tpls = allTpls.filter((t) => !/per character level/.test(t) && !randomTpls.includes(t));
@@ -376,6 +390,28 @@
         break;
       }
     });
+    // Possible stats from an unread half of the name: only clear matches count, nothing is filled in.
+    if (optional.length) {
+      const opt = [];
+      lines.forEach((line, li) => {
+        if (taken.has(li) || !/\d/.test(line)) return;
+        const L = letters(normalize(line));
+        optional.forEach((t, oi) => {
+          const T = letters(t);
+          let sc = 0;
+          for (let off = 0; off <= Math.max(0, L.length - T.length); off++) sc = Math.max(sc, 1 - wlev(L.slice(off, off + T.length), T) / T.length);
+          if (sc >= 0.75) opt.push({ li, oi, sc });
+        });
+      });
+      opt.sort((a, b) => b.sc - a.sc);
+      const usedO = new Set();
+      for (const o of opt) {
+        if (taken.has(o.li) || usedO.has(o.oi)) continue;
+        const filled = fillTemplate(optional[o.oi], photoNumbers(lines[o.li]));
+        if (/\(check\)$/.test(filled)) continue;
+        taken.add(o.li); usedO.add(o.oi); out.push({ at: o.li, text: filled });
+      }
+    }
     // Anything else the general parser recognises (e.g. "+148 to Life (Based on Character Level)", sockets).
     lines.forEach((l, li) => {
       if (taken.has(li)) return;

@@ -75,6 +75,7 @@ function prop(code, par, min, max) {
     "red-dmg": `Damage Reduced by ${r}`, "red-dmg%": `Damage Reduced by ${r}%`, "red-mag": `Magic Damage Reduced by ${r}`,
     deadly: `${r}% Deadly Strike`, crush: `${r}% Chance of Crushing Blow`, openwounds: `${r}% Chance of Open Wounds`,
     "ignore-ac": "Ignore Target's Defense", noheal: "Prevent Monster Heal", nofreeze: "Cannot Be Frozen", "half-freeze": "Half Freeze Duration",
+    stam: `${P} Maximum Stamina`, "regen-stam": `Heal Stamina Plus ${r}%`,
     knock: "Knockback", indestruct: "Indestructible", sock: `Socketed (${min != null || max != null ? r : par})`, ease: `Requirements ${r}%`, light: `${P} to Light Radius`,
     thorns: `Attacker Takes Damage of ${r}`, "heal-kill": `${P} Life after each Kill`, "mana-kill": `${P} to Mana after each Kill`,
     slow: `Slows Target by ${r}%`, howl: `Hit Causes Monster to Flee ${r}%`, stupidity: "Hit Blinds Target", freeze: `Freezes Target ${P}`,
@@ -214,7 +215,9 @@ for (const file of ["magicprefix", "magicsuffix"]) {
   }
 }
 for (const t of Object.keys(AFFIXES)) for (const [n, v] of Object.entries(AFFIXES[t])) {
-  const lines = fold([...new Set(v.mods.map((m) => prop(...m)).filter(Boolean))]);
+  // fire-min/fire-max etc. form one "Adds X-Y Fire Damage" line
+  const rec = {}; v.mods.forEach((m, i) => { rec[`prop${i + 1}`] = m[0]; rec[`min${i + 1}`] = m[2]; rec[`max${i + 1}`] = m[3]; });
+  const lines = fold([...new Set([...v.mods.filter((m) => !/^(fire|cold|ltng|mag)-(min|max|len)$/.test(m[0])).map((m) => prop(...m)), ...elemPairs(rec, v.mods.length)].filter(Boolean))]);
   if (lines.length) AFFIXES[t][n] = lines.join(", "); else delete AFFIXES[t][n];
 }
 fs.writeFileSync(OUT, "// Full D2R catalog generated from blizzhackers/d2data (MIT): every unique, set item and runeword.\n// Curated entries in data.js take priority; this fills in everything else.\nconst CATALOG = " + JSON.stringify(out).replace(/\},\{/g, "},\n{") + ";\n" +
