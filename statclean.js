@@ -223,7 +223,11 @@
   const letters = (s) => s.toLowerCase().replace(/[^a-z]/g, "");
   const NUM_RE = /(\d+(?:\.\d+)?)(?:\s*-\s*(\d+(?:\.\d+)?))?/g;
   function photoNumbers(line) {
-    const fixed = fixZeros(line).replace(/(?<=\d)[oO](?=\d|\b)/g, "0").replace(/(?<=\d)[lI|](?=\d)/g, "1").replace(/\b[lI|](?=\d)/g, "1");
+    const LOOK = { o: "0", O: "0", D: "0", l: "1", I: "1", "|": "1", i: "1", Z: "2", z: "2", S: "5", s: "5", B: "8", g: "9", q: "9", G: "6", b: "6" };
+    // A look-alike letter next to a digit or "%" is a digit ("Z8%" → 28%, "1Ø" → 10).
+    const fixed = fixZeros(line)
+      .replace(/(?<=[\d])[oODlI|iZzSsBgqGb](?=[\d%]|\b)/g, (c) => LOOK[c])
+      .replace(/(?<=[+\-\s]|^)[oODlI|iZzSsBgqGb](?=\d)/g, (c) => LOOK[c]);
     return [...fixed.matchAll(/\d+/g)].map((m) => Number(m[0]));
   }
   function fillTemplate(tpl, nums) {
@@ -236,8 +240,8 @@
       }
       return tpl;
     }
-    let k = 0;
-    return tpl.replace(NUM_RE, (m, a, b) => {
+    let k = 0, unread = false;
+    const out = tpl.replace(NUM_RE, (m, a, b) => {
       const lo = Number(a), hi = b != null ? Number(b) : lo;
       // take the next photo number that fits this stat's range (a little slack for rounding)
       const fits = (n) => n >= Math.floor(lo * 0.95) && n <= Math.ceil(hi * 1.05);
@@ -245,10 +249,14 @@
         const n = nums[i];
         if (fits(n)) { k = i + 1; return String(n); }
         if (fits(n * 10)) { k = i + 1; return String(n * 10); } // trailing zero dropped by OCR ("2" for 20)
+        // "%" read as a digit: "282" for 28%
+        if (n >= 100 && fits(Math.floor(n / 10))) { k = i + 1; return String(Math.floor(n / 10)); }
       }
       if (b == null) return a;      // fixed value: trust the game data
+      unread = true;
       return m;                      // variable and unreadable: leave the range so it's obvious to edit
     });
+    return unread ? `${out} (check)` : out;
   }
   // Skills a "+3 to a Random <Class> Skill" item can roll (Ormus' Robes: game skill IDs 36-60).
   const RANDOM_SKILLS = {
