@@ -283,6 +283,36 @@
     $("#newChar").disabled = state.chars.length >= MAX_CHARS;
   }
 
+  // ---------- README shown on the landing page ----------
+  let readmeHtml = null; // null = not fetched yet, "" = unavailable
+  let readmeOpen = null; // user's expand/collapse choice; null = open only when there are no accounts yet
+  const mdInline = (t) => esc(t)
+    .replace(/`([^`]+)`/g, "<code>$1</code>")
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/\[([^\]]+)\]\((https?:[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  function mdToHtml(md) {
+    const out = []; let list = false, para = [];
+    const flush = () => { if (para.length) out.push(`<p>${mdInline(para.join(" "))}</p>`); para = []; if (list) { out.push("</ul>"); list = false; } };
+    for (const line of md.split(/\r?\n/)) {
+      const h = line.match(/^(#{1,3})\s+(.*)/), li = line.match(/^\s*[-*]\s+(.*)/);
+      if (h) { flush(); out.push(`<h${h[1].length + 1}>${mdInline(h[2])}</h${h[1].length + 1}>`); }
+      else if (li) { if (para.length) { out.push(`<p>${mdInline(para.join(" "))}</p>`); para = []; } if (!list) { out.push("<ul>"); list = true; } out.push(`<li>${mdInline(li[1])}</li>`); }
+      else if (!line.trim()) flush();
+      else { if (list) { out.push("</ul>"); list = false; } para.push(line.trim()); }
+    }
+    flush();
+    return out.join("");
+  }
+  function loadReadme() {
+    if (readmeHtml !== null) return;
+    readmeHtml = "";
+    fetch("README.md", { cache: "no-cache" })
+      .then((r) => (r.ok ? r.text() : ""))
+      .then((md) => { readmeHtml = md ? mdToHtml(md.replace(/^#\s.*\n/, "")) : ""; const el = $("#readme"); if (el) { el.innerHTML = readmeHtml; $("#readmeBox").hidden = !readmeHtml; } })
+      .catch(() => {});
+  }
+
   // ---------- login / account screens ----------
   function renderLogin() {
     const app = $("#app");
@@ -291,6 +321,7 @@
     const picked = accounts.find((a) => a.id === pickedAcct);
     app.innerHTML = `
       <div class="login">
+        <details class="card readme" id="readmeBox" ${readmeHtml ? "" : "hidden"} ${(readmeOpen ?? !accounts.length) ? "open" : ""}><summary>About Gear Ledger</summary><div id="readme">${readmeHtml || ""}</div></details>
         ${accounts.length ? `<section class="card">
           <h2>Accounts</h2>
           <div class="acct-list">${list}</div>
@@ -319,6 +350,8 @@
         </section>
       </div>`;
 
+    loadReadme();
+    $("#readmeBox").ontoggle = (e) => { readmeOpen = e.target.open; };
     app.querySelectorAll(".acct").forEach((b) => (b.onclick = () => { pickedAcct = b.dataset.id; renderLogin(); $("#unlockPw")?.focus(); }));
     const uf = $("#unlockForm");
     if (uf) uf.onsubmit = async (e) => {
