@@ -75,7 +75,7 @@ function prop(code, par, min, max) {
     "red-dmg": `Damage Reduced by ${r}`, "red-dmg%": `Damage Reduced by ${r}%`, "red-mag": `Magic Damage Reduced by ${r}`,
     deadly: `${r}% Deadly Strike`, crush: `${r}% Chance of Crushing Blow`, openwounds: `${r}% Chance of Open Wounds`,
     "ignore-ac": "Ignore Target's Defense", noheal: "Prevent Monster Heal", nofreeze: "Cannot Be Frozen", "half-freeze": "Half Freeze Duration",
-    knock: "Knockback", indestruct: "Indestructible", sock: `Socketed (${r})`, ease: `Requirements ${r}%`, light: `${P} to Light Radius`,
+    knock: "Knockback", indestruct: "Indestructible", sock: `Socketed (${min != null || max != null ? r : par})`, ease: `Requirements ${r}%`, light: `${P} to Light Radius`,
     thorns: `Attacker Takes Damage of ${r}`, "heal-kill": `${P} Life after each Kill`, "mana-kill": `${P} to Mana after each Kill`,
     slow: `Slows Target by ${r}%`, howl: `Hit Causes Monster to Flee ${r}%`, stupidity: "Hit Blinds Target", freeze: `Freezes Target ${P}`,
     pierce: `${r}% Chance to Pierce`, "dmg-to-mana": `${r}% Damage Taken Goes to Mana`, addxp: `${P}% to Experience Gained`,
@@ -96,7 +96,9 @@ function prop(code, par, min, max) {
   if ((m = code.match(/^extra-(fire|cold|ltng|pois|mag)$/))) return `${P}% to ${EL[m[1]]} Skill Damage`;
   if ((m = code.match(/^(str|dex|vit|enr|hp|mana|ac|att|mag%|gold%|deadly|dmg%|dmg-max|thorns|regen|res-fire|res-cold|res-ltng|res-pois|abs-fire|abs-cold|abs-ltng)\/lvl$/))) {
     const N = { str: "Strength", dex: "Dexterity", vit: "Vitality", enr: "Energy", hp: "Life", mana: "Mana", ac: "Defense", att: "Attack Rating", "mag%": "% Better Chance of Getting Magic Items", "gold%": "% Extra Gold", deadly: "% Deadly Strike", "dmg%": "% Enhanced Damage", "dmg-max": "Maximum Damage", thorns: "Attacker Takes Damage", regen: "Replenish Life", "res-fire": "% Fire Resist", "res-cold": "% Cold Resist", "res-ltng": "% Lightning Resist", "res-pois": "% Poison Resist", "abs-fire": "Fire Absorb", "abs-cold": "Cold Absorb", "abs-ltng": "Lightning Absorb" }[m[1]];
-    return N.startsWith("%") ? `+${perLvl(par)}% ${N.slice(1).trim()} per character level` : `+${perLvl(par)} ${N} per character level`;
+    // Uniques keep the per-level value in "par"; runewords and set items use min/max instead.
+    const v = par != null && par !== "" ? perLvl(par) : min != null && max != null && min !== max ? `${perLvl(min)}-${perLvl(max)}` : perLvl(min ?? max);
+    return N.startsWith("%") ? `+${v}% ${N.slice(1).trim()} per character level` : `+${v} ${N} per character level`;
   }
   if (CLS[code]) return `${P} to ${CLS[code]} Skill Levels`;
   if (code === "skilltab") { const t = Number(par); return `${P} to ${TABS[t] || "skill tree"} Skills (${CLS[TAB_CLS[t]] || "class"} Only)`; }
@@ -128,7 +130,9 @@ function propsOf(rec, pre, n, pfx = "") {
   const out = [];
   for (let i = 1; i <= n; i++) {
     const code = rec[`${pre}${i}`]; if (!code) continue;
-    const t = prop(code, rec[`${pfx}par${i}`] ?? rec[`${pre.replace(/Code$/, "Param")}${i}`], rec[`${pfx}min${i}`] ?? rec[`${pre.replace(/Code$/, "Min")}${i}`], rec[`${pfx}max${i}`] ?? rec[`${pre.replace(/Code$/, "Max")}${i}`]);
+    // Uniques/sets use par/min/max; runewords use T1Param/T1Min/T1Max.
+    const alt = (k) => (/Code$/.test(pre) ? rec[`${pre.replace(/Code$/, k)}${i}`] : undefined);
+    const t = prop(code, rec[`${pfx}par${i}`] ?? alt("Param"), rec[`${pfx}min${i}`] ?? alt("Min"), rec[`${pfx}max${i}`] ?? alt("Max"));
     if (t) out.push(t);
   }
   return fold([...new Set(out)]);
