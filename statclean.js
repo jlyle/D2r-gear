@@ -298,11 +298,13 @@
     affixes = affixes || root.AFFIXES;
     if (!affixes) return null;
     const lines = String(text || "").split(/\n+/).map((l) => l.toLowerCase().replace(/[^a-z' ]/g, " ").replace(/\s+/g, " ").trim());
+    let type = null, p = null, q = null;
     for (const line of lines) {
       for (const [t, re] of AFF_BASES) {
         const m = line.match(re);
-        if (!m || /keep in|inventory/.test(line)) continue;
-        const table = affixes[t] || {}, out = [];
+        if (!m || /keep in|inventory/.test(line) || (type && type !== t)) continue;
+        type = t;
+        const table = affixes[t] || {};
         const pick = (frag, isSuffix) => {
           const f = letters(frag);
           if (f.length < 3) return null;
@@ -310,7 +312,7 @@
           for (const [name, stats] of Object.entries(table)) {
             if (isSuffix !== /^of /.test(name)) continue;
             const n = letters(name);
-            // the fragment may carry junk in front ("piecobalt"): compare its tail too
+            // the fragment may carry junk around it ("piecobalt"): compare its ends too
             const cands = isSuffix ? [f.slice(0, n.length), f] : [f.slice(-n.length), f];
             for (const c of cands) {
               const d = wlev(c, n) / n.length;
@@ -321,19 +323,18 @@
         };
         const pre = line.slice(0, m.index).trim().split(" ").slice(-2).join(" ");
         const suf = line.slice(m.index + m[0].length).trim();
-        const p = pick(pre, false), q = /^o\w? /.test(suf) ? pick(suf.replace(/^o\w? /, "of "), true) : null;
-        if (p) out.push(p);
-        if (q) out.push(q);
-        if (!out.length) continue;
-        // Half the name unread (e.g. only "of Good Luck"): any of the other half's stats may be on it.
-        const optional = [];
-        if (!p) for (const [n, v] of Object.entries(table)) if (!/^of /.test(n)) optional.push(...splitStats(v));
-        if (!q && /^o\w? /.test(suf) || !q && !suf) for (const [n, v] of Object.entries(table)) if (/^of /.test(n)) optional.push(...splitStats(v));
-        const res = out.join(", ");
-        return Object.assign(new String(res), { optional: [...new Set(optional)].filter((o) => !res.includes(o)) });
+        p = p || pick(pre, false);
+        q = q || (/^o\w? /.test(suf) ? pick(suf.replace(/^o\w? /, "of "), true) : null);
+        break;
       }
     }
-    return null;
+    if (!type || (!p && !q)) return null;
+    const table = affixes[type] || {};
+    const res = [p, q].filter(Boolean).join(", ");
+    // Half the name unread (covered by the cursor, say): any of that half's stats may be on it.
+    const optional = [];
+    for (const [n, v] of Object.entries(table)) if ((!p && !/^of /.test(n)) || (!q && /^of /.test(n))) optional.push(...splitStats(v));
+    return Object.assign(new String(res), { optional: [...new Set(optional)].filter((o) => !res.includes(o)) });
   }
   const splitStats = (str) => String(str || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter(Boolean);
   function cleanStatsForItem(text, itemStats, trusted) {
@@ -370,16 +371,21 @@
       if (r) { taken.add(r.li); out.push({ at: r.li, text: r.text }); }
       else out.push({ at: -1, text: `${t} (check)` });
     }
+    // The photo is read more than once, so a stat can have several candidate lines: prefer one whose
+    // number is readable, falling back to the best text match (flagged "check").
+    const fallback = new Map();
     for (const p of pairs) {
       if (used.has(p.ti) || taken.has(p.li)) continue;
+      const text = fillTemplate(tpls[p.ti], photoNumbers(lines[p.li]));
+      if (/\(check\)$/.test(text) || (text === tpls[p.ti] && /\d+\s*-\s*\d+/.test(text))) { if (!fallback.has(p.ti)) fallback.set(p.ti, p); continue; }
       used.add(p.ti); taken.add(p.li);
-      out.push({ at: p.li, text: fillTemplate(tpls[p.ti], photoNumbers(lines[p.li])) });
+      out.push({ at: p.li, text });
     }
     // Name-derived templates are certain, so a garbled line ("Peon ResisT 8%") still counts if it has the
     // stat's key word and a number in range.
     if (trusted) tpls.forEach((t, ti) => {
       if (used.has(ti)) return;
-      const keys = t.toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter((w) => w.length >= 5 && !/^(chance|getting)$/.test(w));
+      const keys = t.toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter((w) => w.length >= 4 && !/^(chance|getting|with|from|than)$/.test(w));
       for (let li = 0; li < lines.length; li++) {
         if (taken.has(li)) continue;
         const words = normalize(lines[li]).toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean);
@@ -390,6 +396,11 @@
         break;
       }
     });
+    for (const [ti, p] of fallback) {
+      if (used.has(ti) || taken.has(p.li)) continue;
+      used.add(ti); taken.add(p.li);
+      out.push({ at: p.li, text: fillTemplate(tpls[ti], photoNumbers(lines[p.li])) });
+    }
     // Possible stats from an unread half of the name: only clear matches count, nothing is filled in.
     if (optional.length) {
       const opt = [];
@@ -400,7 +411,7 @@
           const T = letters(t);
           let sc = 0;
           for (let off = 0; off <= Math.max(0, L.length - T.length); off++) sc = Math.max(sc, 1 - wlev(L.slice(off, off + T.length), T) / T.length);
-          if (sc >= 0.75) opt.push({ li, oi, sc });
+          if (sc >= 0.62) opt.push({ li, oi, sc });
         });
       });
       opt.sort((a, b) => b.sc - a.sc);
@@ -432,7 +443,11 @@
       const already = out.some((o) => /based on character level/i.test(o.text) && o.text.toLowerCase().includes(stat.replace(/^%\s*/, "").split(" ").pop()));
       if (!already) out.push({ at: 2e6, text: t });
     }
-    return out.sort((a, b) => a.at - b.at).map((o) => o.text);
+    const seen = new Set();
+    return out.sort((a, b) => a.at - b.at).map((o) => o.text).filter((t) => {
+      const k = t.toLowerCase().replace(/\s*\(check\)$/, "").replace(/[+\-]?\d+(?:\.\d+)?(?:-\d+)?/g, "#");
+      return seen.has(k) ? false : seen.add(k);
+    });
   }
 
   root.StatClean = { cleanStats, parseLine, cleanStatsForItem, affixTemplates };
