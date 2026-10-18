@@ -106,7 +106,7 @@ function prop(code, par, min, max) {
   const procs = { "hit-skill": "on Striking", "gethit-skill": "When Struck", "att-skill": "on Attack", "kill-skill": "When You Kill an Enemy", "death-skill": "When You Die", "levelup-skill": "When You Level-Up" };
   if (procs[code]) return `${min}% Chance to Cast Level ${max} ${skillName(par)} ${procs[code]}`;
   if (code === "charged") return `Level ${max} ${skillName(par)} (${min} Charges)`;
-  if (code === "skill-rand") return `+${min ?? ""} to a random class skill`;
+  if (code === "skill-rand") { const c = CLS[skillCls[Number(min)]] || "Class"; return `+${par} to a Random ${c} Skill (${c} Only)`; }
   return null; // uncommon codes are left out of the summary
 }
 

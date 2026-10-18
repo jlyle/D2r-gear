@@ -250,10 +250,38 @@
       return m;                      // variable and unreadable: leave the range so it's obvious to edit
     });
   }
+  // Skills a "+3 to a Random <Class> Skill" item can roll (Ormus' Robes: game skill IDs 36-60).
+  const RANDOM_SKILLS = {
+    sorceress: ["Fire Bolt", "Warmth", "Charged Bolt", "Ice Bolt", "Frozen Armor", "Inferno", "Static Field", "Telekinesis",
+      "Frost Nova", "Ice Blast", "Blaze", "Fire Ball", "Nova", "Lightning", "Shiver Armor", "Fire Wall", "Enchant",
+      "Chain Lightning", "Teleport", "Glacial Spike", "Meteor", "Thunder Storm", "Energy Shield", "Blizzard", "Chilling Armor"],
+  };
+  // Find the photo line for a random-skill stat ("+3 to Blizzard (Sorceress Only)") and name the skill.
+  function readRandomSkill(tpl, lines, taken) {
+    const m = tpl.match(/^\+?(\d+) to a random (\w+) skill \((\w+) only\)/i);
+    if (!m) return null;
+    const cls = m[2], list = RANDOM_SKILLS[cls.toLowerCase()] || [];
+    let best = null;
+    lines.forEach((line, li) => {
+      if (taken.has(li)) return;
+      const n = normalize(line).toLowerCase();
+      const om = n.match(/\bto\s+(.+?)\s*\(?\s*(\w+)\s+only/) || n.match(/\bto\s+(.+?)\s*\(\s*(\w+)/);
+      if (!om || wlev(letters(om[2]), cls.toLowerCase()) > 3) return;
+      const sk = letters(om[1]);
+      for (const name of list) {
+        const d = wlev(sk, letters(name)) / letters(name).length;
+        if (d <= 0.34 && (!best || d < best.d)) best = { li, d, name };
+      }
+    });
+    if (!best) return null;
+    const lvl = photoNumbers(lines[best.li]).find((x) => x >= 1 && x <= 3) || Number(m[1]);
+    return { li: best.li, text: `+${lvl} to ${best.name} (${cls} Only)` };
+  }
   function cleanStatsForItem(text, itemStats) {
     const allTpls = String(itemStats || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter(Boolean);
     const perLevel = allTpls.filter((t) => /per character level/.test(t));
-    const tpls = allTpls.filter((t) => !/per character level/.test(t));
+    const randomTpls = allTpls.filter((t) => /to a random \w+ skill/i.test(t));
+    const tpls = allTpls.filter((t) => !/per character level/.test(t) && !randomTpls.includes(t));
     // Drop base-item lines (Required Strength, Durability, Defense:) so they can't pose as stats.
     const lines = String(text || "").split(/\n+/).map((l) => l.trim())
       .filter((l) => letters(l).length >= 4 && !/^[^a-z]*(required|durability|defense\s*:|chance to block|one.hand|two.hand|throw damage|quantity|item version|.*class\s*-)/i.test(normalize(l)));
@@ -277,6 +305,11 @@
     const matchedTpls = new Set(pairs.filter((p) => p.s >= 0.7).map((p) => p.ti));
     if (tpls.length && matchedTpls.size < Math.min(tpls.length, Math.max(2, Math.ceil(tpls.length * 0.34)))) return cleanStats(text);
     const used = new Set(), taken = new Set(), out = [];
+    for (const t of randomTpls) {
+      const r = readRandomSkill(t, lines, taken);
+      if (r) { taken.add(r.li); out.push({ at: r.li, text: r.text }); }
+      else out.push({ at: -1, text: `${t} (check)` });
+    }
     for (const p of pairs) {
       if (used.has(p.ti) || taken.has(p.li)) continue;
       used.add(p.ti); taken.add(p.li);

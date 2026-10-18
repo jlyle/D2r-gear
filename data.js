@@ -657,7 +657,7 @@ const BUILDS = [
       armor: T(["Stealth"], ["Skin of the Vipermagi"], ["Enigma", "Ormus' Robes"]),
     },
     charms: ["Cold Rupture", ...CASTER_SKILLS],
-    notes: "Hybrid cold/fire covers immunes on its own; Ormus' Robes can roll +3 Frozen Orb or Hydra." },
+    notes: "Hybrid cold/fire covers immunes on its own; Ormus' Robes can roll +3 Blizzard or Meteor (never Frozen Orb, Hydra or masteries)." },
 
   // ===== WARLOCK =====
   { id: "echo-lock", name: "Echoing Strike Warlock", cls: "Warlock", caster: true, fcrTarget: 75, base: MELEE_COMMON,
