@@ -278,9 +278,9 @@
         <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option ${m === c.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
-        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${stashCount()})`], ["runewords", "Runewords"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
+        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${stashCount()})`], ["runewords", "Runewords"], ["cube", "Gems & Cube"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
-      ${!["upgrades", "skills", "runewords"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
+      ${!["upgrades", "skills", "runewords", "cube"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
       <section id="tabBody"></section>`;
 
     $("#fName").oninput = (e) => { c.name = e.target.value; save(); renderRoster(); };
@@ -307,6 +307,7 @@
     else if (tab === "stash") renderStash(body, c);
     else if (tab === "skills") renderSkills(body, c);
     else if (tab === "runewords") renderRunewords(body, c);
+    else if (tab === "cube") renderCube(body, c);
     else renderUpgrades(body, c);
   }
 
@@ -842,6 +843,88 @@
         ${close.length ? close.map(card).join("") : `<p class="notes">Nothing within two runes yet.</p>`}
       </div>`;
     body.querySelectorAll("[data-rwf]").forEach((btn) => (btn.onclick = () => { rwFilter = btn.dataset.rwf; render(); }));
+  }
+
+  // ---------- gems & Horadric Cube upgrades ----------
+  const GEM_TYPES = ["Topaz", "Amethyst", "Sapphire", "Ruby", "Emerald", "Diamond", "Skull"];
+  const GEM_GRADES = ["Chipped", "Flawed", "", "Flawless", "Perfect"];
+  const gemName = (grade, type) => (grade ? `${grade} ${type}` : type);
+  const gradeLabel = (g) => g || "Normal";
+  // Game cube recipes: El–Ort take 3 runes; Thul–Lem 3 runes + a gem; Pul–Cham 2 runes + a gem.
+  // The gem cycles Topaz, Amethyst, Sapphire, Ruby, Emerald, Diamond and steps up a grade every six runes.
+  function runeRecipe(i) {
+    const from = RUNE_ORDER[i], to = RUNE_ORDER[i + 1];
+    if (!to) return null;
+    const qty = i >= RUNE_ORDER.indexOf("Pul") ? 2 : 3;
+    const k = i - RUNE_ORDER.indexOf("Thul");
+    const gem = k >= 0 ? gemName(GEM_GRADES[Math.floor(k / 6)], GEM_TYPES[k % 6]) : null;
+    return { from, to, qty, gem };
+  }
+  function stashCounts(slot) {
+    const have = {};
+    for (const e of state.stash) if (byName.get(e.item)?.slot === slot) have[e.item] = (have[e.item] || 0) + qtyOf(e);
+    return have;
+  }
+  function renderCube(body, c) {
+    const runes = stashRunes();
+    const gems = stashCounts("gem");
+    const gemTotal = Object.values(gems).reduce((a, b) => a + b, 0);
+    const now = [], needGem = [];
+    for (let i = 0; i < RUNE_ORDER.length - 1; i++) {
+      const r = runeRecipe(i);
+      const n = Math.floor((runes[r.from] || 0) / r.qty);
+      if (!n) continue;
+      if (!r.gem) { now.push({ ...r, times: n }); continue; }
+      const g = gems[r.gem] || 0;
+      if (g) now.push({ ...r, times: Math.min(n, g) });
+      else {
+        // Could the missing gem be cubed from three of the grade below?
+        const [grade, type] = (() => { for (const gr of GEM_GRADES) for (const t of GEM_TYPES) if (gemName(gr, t) === r.gem) return [gr, t]; return ["", ""]; })();
+        const lower = GEM_GRADES.indexOf(grade) > 0 ? gemName(GEM_GRADES[GEM_GRADES.indexOf(grade) - 1], type) : null;
+        needGem.push({ ...r, times: n, lower, lowerHave: lower ? gems[lower] || 0 : 0 });
+      }
+    }
+    now.sort((a, b) => runeRank(b.to) - runeRank(a.to));
+    needGem.sort((a, b) => runeRank(b.to) - runeRank(a.to));
+    const gemUps = [];
+    for (const t of GEM_TYPES) for (let gi = 0; gi < GEM_GRADES.length - 1; gi++) {
+      const from = gemName(GEM_GRADES[gi], t), to = gemName(GEM_GRADES[gi + 1], t);
+      const n = Math.floor((gems[from] || 0) / 3);
+      if (n) gemUps.push({ from, to, times: n });
+    }
+    const runeChip = (r, cls = "have") => `<span class="rune-chip ${cls}">${esc(r)}</span>`;
+    const gemChip = (g, cls) => `<span class="gem-chip ${cls} gem-${(g.split(" ").pop() || "").toLowerCase()}">${esc(g)}</span>`;
+    const recipeRow = (r, extra = "") => `<div class="cube-row">
+        <div class="cube-recipe">${r.qty} × ${runeChip(r.from)}${r.gem ? ` + ${gemChip(r.gem, extra ? "need" : "have")}` : ""} <span class="arrow">→</span> ${runeChip(r.to, "out")}</div>
+        <div class="cube-meta">${extra || `<span class="rw-qty">×${r.times} <small>can do</small></span>`}</div>
+      </div>`;
+    const gemGrid = gemTotal ? `<div class="gem-grid" role="table" aria-label="Gems in your stash">
+        <div class="gg-h" role="row"><span></span>${GEM_GRADES.map((g) => `<span role="columnheader">${gradeLabel(g)}</span>`).join("")}</div>
+        ${GEM_TYPES.filter((t) => GEM_GRADES.some((g) => gems[gemName(g, t)])).map((t) => `<div class="gg-r" role="row"><span class="gem-name gem-${t.toLowerCase()}" role="rowheader">${t}</span>${GEM_GRADES.map((g) => { const n = gems[gemName(g, t)] || 0; return `<span class="${n ? "n" : "z"}" role="cell">${n || "·"}</span>`; }).join("")}</div>`).join("")}
+      </div>` : `<p class="notes">No gems in your stash yet. Add them on the Stash tab (Gear type: Gem).</p>`;
+    body.innerHTML = `
+      <div class="card">
+        <h3>Gems in your stash</h3>
+        ${gemGrid}
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Rune upgrades you can cube now (${now.length})</h3>
+        <p class="notes" style="margin-top:4px">From the runes and gems in your stash. Best result first. Each recipe is counted on its own, so two recipes can be counting the same gem.</p>
+        ${now.length ? now.map((r) => recipeRow(r)).join("") : `<p class="notes">${Object.keys(runes).length ? "None yet — you need 3 of a rune (2 from Pul up), plus the right gem from Thul up." : "Add runes on the Stash tab to see upgrades."}</p>`}
+      </div>
+      ${needGem.length ? `<div class="card" style="margin-top:12px">
+        <h3>Missing only the gem (${needGem.length})</h3>
+        ${needGem.map((r) => recipeRow(r, `Need ${esc(r.gem)}${r.lower && r.lowerHave >= 3 ? ` — or cube 3 of your ${r.lowerHave} ${esc(r.lower)}` : r.lower ? ` <span class="notes">(3 ${esc(r.lower)} make one; you have ${r.lowerHave})</span>` : ""}`)).join("")}
+      </div>` : ""}
+      <div class="card" style="margin-top:12px">
+        <h3>Gem upgrades (${gemUps.length})</h3>
+        <p class="notes" style="margin-top:4px">3 gems of the same kind and grade make one of the next grade.</p>
+        ${gemUps.length ? gemUps.map((g) => `<div class="cube-row"><div class="cube-recipe">3 × ${gemChip(g.from, "have")} <span class="arrow">→</span> ${gemChip(g.to, "out")}</div><div class="cube-meta"><span class="rw-qty">×${g.times} <small>can do</small></span></div></div>`).join("") : `<p class="notes">Nothing to combine — you need 3 of the same gem.</p>`}
+      </div>
+      <details class="card cube-ref" style="margin-top:12px">
+        <summary>All rune recipes</summary>
+        ${RUNE_ORDER.slice(0, -1).map((_, i) => { const r = runeRecipe(i); return `<div class="cube-ref-row">${r.qty} ${esc(r.from)}${r.gem ? ` + ${esc(r.gem)}` : ""} → <b>${esc(r.to)}</b></div>`; }).join("")}
+      </details>`;
   }
 
   function renderStash(body, c) {

@@ -299,3 +299,23 @@ dialog h2 { font-size: 18px; }
 .qty { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 1px; }
 .qty .btn { min-width: 34px; padding: 4px 0; border: 0; font-size: 18px; line-height: 1; }
 .qty .qn { min-width: 26px; text-align: center; font-weight: 700; }
+
+/* Gems & Cube tab */
+.cube-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line); }
+.cube-row:first-of-type { border-top: 0; }
+.cube-recipe { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cube-recipe .arrow { color: var(--muted); font-size: 18px; }
+.rune-chip.out { color: var(--accent); border-color: var(--accent); background: rgba(200,162,82,.12); }
+.gem-chip { font: 600 13px Inter, sans-serif; padding: 3px 10px; border-radius: 99px; border: 1px solid currentColor; }
+.gem-chip.need { border-style: dashed; opacity: .8; }
+.gem-chip.out { background: rgba(255,255,255,.06); }
+.gem-topaz { color: #e8c44a; } .gem-amethyst { color: #b07ee0; } .gem-sapphire { color: #6c9cf0; }
+.gem-ruby { color: #e0605a; } .gem-emerald { color: #4fc27a; } .gem-diamond { color: #dfe6ee; } .gem-skull { color: #c9bfae; }
+.gem-grid { display: grid; gap: 4px; margin-top: 8px; font-size: 14px; }
+.gem-grid > div { display: grid; grid-template-columns: 1.3fr repeat(5, 1fr); gap: 4px; align-items: center; }
+.gg-h span { color: var(--muted); font-size: 11px; text-align: center; }
+.gg-r span { text-align: center; } .gg-r .gem-name { text-align: left; font-weight: 600; }
+.gg-r .n { font-weight: 700; } .gg-r .z { color: var(--line); }
+.cube-ref summary { cursor: pointer; color: var(--accent); font-weight: 600; }
+.cube-ref-row { font-size: 14px; padding: 3px 0; color: var(--muted); } .cube-ref-row b { color: var(--text); }
+.cube-meta { font-size: 14px; color: var(--muted); }
