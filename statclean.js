@@ -10,6 +10,17 @@
   const N = "([+\\-]?\\d{1,4})";          // a signed number
   const GAP = "\\s*(?:\\S{1,3}\\s+)?";     // tolerate one short garbled word ("Te" for "to")
   const ELEM = "(fire|cold|lightning|poison|magic)";
+  const RGAP = "\\s*[:.]?\\s*";              // "Fire Resist: +30%"
+  // Item resists never go past 100. A bigger number is an OCR slip: "+" read as 4/7
+  // ("430" → 30), "%" read as 2/9 ("302" → 30), or a slashed zero doubled ("300" → 30).
+  function res(n) {
+    const sg = /^-/.test(n) ? "-" : /^\+/.test(n) ? "+" : "", d = n.replace(/^[+\-]/, "");
+    if (Number(d) <= 100) return n;
+    const fix = /^[47]/.test(d) && Number(d.slice(1)) > 0 && Number(d.slice(1)) <= 100 ? d.slice(1)
+      : /0$/.test(d) && Number(d) / 10 <= 100 ? String(Number(d) / 10)
+      : /[29]$/.test(d) && Number(d.slice(0, -1)) <= 100 ? d.slice(0, -1) : d;
+    return sg + fix;
+  }
 
   // Percent stats written "+X% Name". [regex body, display name, plausible max]
   const PCT_BEFORE = [
@@ -41,9 +52,10 @@
     [new RegExp(N + "\\s*%?\\s*to " + ELEM + " skill damage"), (m) => `${sign(m[1])}% to ${SK(m[2])} Skill Damage`],
     [new RegExp("adds (\\d{1,4})\\s*-\\s*(\\d{1,4}) " + ELEM + " damage"), (m) => `Adds ${m[1]}-${m[2]} ${SK(m[3])} Damage`],
     [/adds (\d{1,4})\s*-\s*(\d{1,4}) damage/, (m) => `Adds ${m[1]}-${m[2]} Damage`],
-    [new RegExp("maximum " + ELEM + " resist\\s*" + N), (m) => `Maximum ${SK(m[1])} Resist ${sign(m[2])}%`],
-    [new RegExp(ELEM + " resist\\s*" + N), (m) => `${SK(m[1])} Resist ${sign(m[2])}%`],
-    [/all resistances\s*([+\-]?\d{1,3})/, (m) => `All Resistances ${sign(m[1])}`],
+    [new RegExp(N + "\\s*%?\\s*to maximum " + ELEM + " resist"), (m) => `${sign(res(m[1]))}% to Maximum ${SK(m[2])} Resist`],
+    [new RegExp("maximum " + ELEM + " resist\\w*" + RGAP + N), (m) => `+${res(m[2]).replace(/^[+\-]/, "")}% to Maximum ${SK(m[1])} Resist`],
+    [new RegExp(ELEM + " resist\\w*" + RGAP + N), (m) => `${SK(m[1])} Resist ${sign(res(m[2]))}%`],
+    [new RegExp("all resist\\w*" + RGAP + N), (m) => `All Resistances ${sign(res(m[1]))}`],
     [new RegExp(ELEM + " absorb\\s*(\\d{1,3})\\s*%"), (m) => `${SK(m[1])} Absorb ${m[2]}%`],
     [new RegExp(N + GAP + ELEM + " absorb"), (m) => `${sign(m[1])} ${SK(m[2])} Absorb`],
     // defensive / utility
@@ -110,7 +122,7 @@
     for (const c of CLASSES) { const d = wlev(w, c); if (d < bd) { bd = d; best = c; } }
     return bd <= Math.max(2, w.length * 0.35) ? best : null;
   }
-  const OCR_FIX = { al: "all", ys: "vs", fo: "to", te: "to", t0: "to", ot: "of", lite: "life", iife: "life" };
+  const OCR_FIX = { al: "all", ail: "all", aii: "all", ys: "vs", fo: "to", te: "to", t0: "to", ot: "of", lite: "life", iife: "life" };
 
   function lev(a, b) {
     const m = a.length, n = b.length;
@@ -160,6 +172,8 @@
       .replace(/^\s*\*(?=\d)/, "+").replace(/[“”«»‘’`´]/g, "'")
       .replace(/(\d)\s*[°º]o?/g, "$1%").replace(/(\d)\s*%o\b/g, "$1%")
       .replace(/(^|\s)[il|]\s?(?=\d)/g, "$11") // "I 1%" → "11%"
+      .replace(/(^|\s)[t*]\s?(?=\d)/g, "$1+")  // "t30%" / "*30%" → "+30%" (misread plus sign)
+      .replace(/([a-z])1(?=[a-z])/g, "$1i").replace(/([a-z])0(?=[a-z])/g, "$1o") // "res1st" → "resist"
       .replace(/[—–]/g, "-").replace(/([+\-])\s+(\d)/g, "$1$2").replace(/(\d)\s+%/g, "$1%")
       .replace(/[|\[\]{}=_~;]/g, " ").replace(/\s+/g, " ").trim();
     // "(barbarian euy)" / "(bansanian nvyv)" → "(barbarian only)"
