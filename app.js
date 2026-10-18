@@ -1018,8 +1018,12 @@
   function statNotes(text, it) {
     const skip = new Set(it ? [it.name, it.alias].filter(Boolean).map((n) => n.toLowerCase()) : []);
     // Known unique/set/runeword: match against its own stat lines; otherwise the general parser.
-    const lines = it && it.stats && !["rare", "magic", "misc", "rune", "gem", "jewel"].includes(it.type) && !it.custom && !/Sunder/.test(it.stats)
-      ? StatClean.cleanStatsForItem(text, it.stats)
+    const known = it && it.stats && !["rare", "magic", "misc", "rune", "gem", "jewel"].includes(it.type) && !it.custom && !/Sunder/.test(it.stats)
+      && !(it.type === "charm" && !it.unique1);
+    // Magic charms/jewels: the name ("Cobalt Small Charm of Vita") says which stats to look for.
+    const affix = !known && StatClean.affixTemplates(text);
+    const lines = known ? StatClean.cleanStatsForItem(text, it.stats)
+      : affix ? StatClean.cleanStatsForItem(text, affix, true)
       : StatClean.cleanStats(text, STAT_VOCAB);
     return lines.filter((l) => !skip.has(l.toLowerCase())).slice(0, 18).join("\n");
   }

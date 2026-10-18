@@ -285,7 +285,45 @@
     const lvl = photoNumbers(lines[best.li]).find((x) => x >= 1 && x <= 3) || Number(m[1]);
     return { li: best.li, text: `+${lvl} to ${best.name} (${cls} Only)` };
   }
-  function cleanStatsForItem(text, itemStats) {
+  // Magic charms and jewels: the name says which stats the item has ("Cobalt Small Charm of Vita" =
+  // cold resist + life). Returns those stat templates (with the game's ranges), or null.
+  const AFF_BASES = [["s", /sma\w*\s*cha\w*/], ["m", /lar\w*\s*cha\w*/], ["l", /gra\w*\s*cha\w*/], ["j", /\bjew\w*/]];
+  function affixTemplates(text, affixes) {
+    affixes = affixes || root.AFFIXES;
+    if (!affixes) return null;
+    const lines = String(text || "").split(/\n+/).map((l) => l.toLowerCase().replace(/[^a-z' ]/g, " ").replace(/\s+/g, " ").trim());
+    for (const line of lines) {
+      for (const [t, re] of AFF_BASES) {
+        const m = line.match(re);
+        if (!m || /keep in|inventory/.test(line)) continue;
+        const table = affixes[t] || {}, out = [];
+        const pick = (frag, isSuffix) => {
+          const f = letters(frag);
+          if (f.length < 3) return null;
+          let best = null;
+          for (const [name, stats] of Object.entries(table)) {
+            if (isSuffix !== /^of /.test(name)) continue;
+            const n = letters(name);
+            // the fragment may carry junk in front ("piecobalt"): compare its tail too
+            const cands = isSuffix ? [f.slice(0, n.length), f] : [f.slice(-n.length), f];
+            for (const c of cands) {
+              const d = wlev(c, n) / n.length;
+              if (d <= 0.3 && (!best || d < best.d)) best = { d, stats };
+            }
+          }
+          return best && best.stats;
+        };
+        const pre = line.slice(0, m.index).trim().split(" ").slice(-2).join(" ");
+        const suf = line.slice(m.index + m[0].length).trim();
+        const p = pick(pre, false), q = /^o\w? /.test(suf) ? pick(suf.replace(/^o\w? /, "of "), true) : null;
+        if (p) out.push(p);
+        if (q) out.push(q);
+        if (out.length) return out.join(", ");
+      }
+    }
+    return null;
+  }
+  function cleanStatsForItem(text, itemStats, trusted) {
     const allTpls = String(itemStats || "").split(/,\s+(?![^()]*\))/).map((t) => t.trim()).filter(Boolean);
     const perLevel = allTpls.filter((t) => /per character level/.test(t));
     const randomTpls = allTpls.filter((t) => /to a random \w+ skill/i.test(t));
@@ -311,7 +349,7 @@
     // Sanity check: a correctly identified item shows most of its known stat lines.
     // If the photo matches too few of them, the item is probably wrong — read the photo generically.
     const matchedTpls = new Set(pairs.filter((p) => p.s >= 0.7).map((p) => p.ti));
-    if (tpls.length && matchedTpls.size < Math.min(tpls.length, Math.max(2, Math.ceil(tpls.length * 0.34)))) return cleanStats(text);
+    if (!trusted && tpls.length && matchedTpls.size < Math.min(tpls.length, Math.max(2, Math.ceil(tpls.length * 0.34)))) return cleanStats(text);
     const used = new Set(), taken = new Set(), out = [];
     for (const t of randomTpls) {
       const r = readRandomSkill(t, lines, taken);
@@ -323,6 +361,21 @@
       used.add(p.ti); taken.add(p.li);
       out.push({ at: p.li, text: fillTemplate(tpls[p.ti], photoNumbers(lines[p.li])) });
     }
+    // Name-derived templates are certain, so a garbled line ("Peon ResisT 8%") still counts if it has the
+    // stat's key word and a number in range.
+    if (trusted) tpls.forEach((t, ti) => {
+      if (used.has(ti)) return;
+      const keys = t.toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter((w) => w.length >= 5 && !/^(chance|getting)$/.test(w));
+      for (let li = 0; li < lines.length; li++) {
+        if (taken.has(li)) continue;
+        const words = normalize(lines[li]).toLowerCase().replace(/[^a-z ]/g, " ").split(/\s+/).filter(Boolean);
+        if (!keys.some((k) => words.some((w) => w.length >= 4 && wlev(w, k) <= 1))) continue;
+        const filled = fillTemplate(t, photoNumbers(lines[li]));
+        if (/\(check\)$/.test(filled) || filled === t && /\d+\s*-\s*\d+/.test(t)) continue;
+        used.add(ti); taken.add(li); out.push({ at: li, text: filled });
+        break;
+      }
+    });
     // Anything else the general parser recognises (e.g. "+148 to Life (Based on Character Level)", sockets).
     lines.forEach((l, li) => {
       if (taken.has(li)) return;
@@ -346,5 +399,5 @@
     return out.sort((a, b) => a.at - b.at).map((o) => o.text);
   }
 
-  root.StatClean = { cleanStats, parseLine, cleanStatsForItem };
+  root.StatClean = { cleanStats, parseLine, cleanStatsForItem, affixTemplates };
 })(typeof window !== "undefined" ? window : globalThis);

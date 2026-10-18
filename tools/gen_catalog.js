@@ -191,7 +191,34 @@ for (const r of rws) {
 const seen = new Set();
 const uniq = out.filter((e) => (seen.has(e.name) ? false : seen.add(e.name)));
 out.length = 0; out.push(...uniq);
-fs.writeFileSync(OUT, "// Full D2R catalog generated from blizzhackers/d2data (MIT): every unique, set item and runeword.\n// Curated entries in data.js take priority; this fills in everything else.\nconst CATALOG = " + JSON.stringify(out).replace(/\},\{/g, "},\n{") + ";\n" + MERGE);
+// Magic affixes for charms and jewels: the item's name ("Cobalt Small Charm of Vita") tells the
+// scanner which stat lines to look for. s = small charm, m = large charm, l = grand charm, j = jewel.
+const AFF_TYPES = { scha: "s", mcha: "m", lcha: "l", jewl: "j" };
+const AFFIXES = { s: {}, m: {}, l: {}, j: {} };
+for (const file of ["magicprefix", "magicsuffix"]) {
+  for (const a of Object.values(J(file))) {
+    if (!a.Name || !a.spawnable) continue;
+    const types = new Set();
+    for (let i = 1; i <= 7; i++) if (AFF_TYPES[a[`itype${i}`]]) types.add(AFF_TYPES[a[`itype${i}`]]);
+    if (!types.size) continue;
+    const mods = [];
+    for (let i = 1; i <= 3; i++) if (a[`mod${i}code`]) mods.push([a[`mod${i}code`], a[`mod${i}param`], a[`mod${i}min`], a[`mod${i}max`]]);
+    const name = (STR[a.Name] || a.Name).toLowerCase();
+    for (const t of types) {
+      // Same name in several tiers: widen the ranges.
+      const prev = AFFIXES[t][name];
+      if (prev && prev.mods.length === mods.length && prev.mods.every((m, k) => m[0] === mods[k][0])) {
+        prev.mods.forEach((m, k) => { m[2] = Math.min(m[2] ?? mods[k][2], mods[k][2] ?? m[2]); m[3] = Math.max(m[3] ?? mods[k][3], mods[k][3] ?? m[3]); });
+      } else if (!prev) AFFIXES[t][name] = { mods: mods.map((m) => [...m]) };
+    }
+  }
+}
+for (const t of Object.keys(AFFIXES)) for (const [n, v] of Object.entries(AFFIXES[t])) {
+  const lines = fold([...new Set(v.mods.map((m) => prop(...m)).filter(Boolean))]);
+  if (lines.length) AFFIXES[t][n] = lines.join(", "); else delete AFFIXES[t][n];
+}
+fs.writeFileSync(OUT, "// Full D2R catalog generated from blizzhackers/d2data (MIT): every unique, set item and runeword.\n// Curated entries in data.js take priority; this fills in everything else.\nconst CATALOG = " + JSON.stringify(out).replace(/\},\{/g, "},\n{") + ";\n" +
+  "// Magic charm/jewel affixes by item type (s small, m large, l grand charm, j jewel).\nconst AFFIXES = " + JSON.stringify(AFFIXES) + ";\n" + MERGE);
 console.log("entries", out.length, "by slot", out.reduce((a, e) => (a[e.slot] = (a[e.slot] || 0) + 1, a), {}));
 console.log(JSON.stringify(out.find((e) => e.name === "Heart Carver")));
 console.log(JSON.stringify(out.find((e) => e.name === "Enigma")));
