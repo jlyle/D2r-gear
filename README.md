@@ -1,4 +1,4 @@
-# Gear Ledger — D2R gear tracker
+# Perfect Roll — D2R gear tracker
 
 Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inventory, and get upgrade recommendations by build and budget (Starter / Mid / Endgame).
 

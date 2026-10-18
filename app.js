@@ -1,4 +1,4 @@
-// Gear Ledger — app logic. Plain JS, no build step.
+// Perfect Roll — app logic. Plain JS, no build step.
 (() => {
   const STORE_KEY = "gearLedger.v1";
   const TIER_NAMES = ["Starter", "Mid", "Endgame"];
@@ -322,7 +322,7 @@
     const picked = accounts.find((a) => a.id === pickedAcct);
     app.innerHTML = `
       <div class="login">
-        <details class="card readme" id="readmeBox" ${readmeHtml ? "" : "hidden"} ${(readmeOpen ?? !accounts.length) ? "open" : ""}><summary>About Gear Ledger</summary><div id="readme">${readmeHtml || ""}</div></details>
+        <details class="card readme" id="readmeBox" ${readmeHtml ? "" : "hidden"} ${(readmeOpen ?? !accounts.length) ? "open" : ""}><summary>About Perfect Roll</summary><div id="readme">${readmeHtml || ""}</div></details>
         ${accounts.length ? `<section class="card">
           <h2>Accounts</h2>
           <div class="acct-list">${list}</div>
@@ -399,7 +399,7 @@
     $(".menu").open = false;
     if (!f) return;
     let data;
-    try { data = JSON.parse(await f.text()); } catch (err) { alert("That file isn't a Gear Ledger backup."); return; }
+    try { data = JSON.parse(await f.text()); } catch (err) { alert("That file isn't a Perfect Roll backup."); return; }
     if (data.format === "gear-ledger-account" && data.salt && data.iv && data.data) {
       const acct = addImportedAccount(data);
       alert(`Added account "${acct.name}". Unlock it with its password.`);
@@ -419,7 +419,7 @@
       if (incoming.length > room) alert(`Only ${room} character${room === 1 ? "" : "s"} fit (limit ${MAX_CHARS} per account).`);
       return;
     }
-    alert("That file isn't a Gear Ledger backup.");
+    alert("That file isn't a Perfect Roll backup.");
   }
 
   // Small password dialog (change password).
@@ -1210,7 +1210,7 @@
     const blob = new Blob([JSON.stringify({ format: "gear-ledger-account", v: 2, name, salt, iv, data })], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `gear-ledger-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `perfect-roll-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };

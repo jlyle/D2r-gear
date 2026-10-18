@@ -1,4 +1,4 @@
-// Item database and build guides for Gear Ledger.
+// Item database and build guides for Perfect Roll.
 // Stats are summarized key affixes; ranges shown as low-high. Edit freely.
 // type: unique | set | runeword | rare | charm
 // slot: helm | amulet | ring | weapon | offhand | armor | gloves | belt | boots | charm

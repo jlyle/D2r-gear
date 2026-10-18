@@ -1,4 +1,4 @@
-// Original line icons for item classes (drawn for Gear Ledger, 48×48, stroked
+// Original line icons for item classes (drawn for Perfect Roll, 48×48, stroked
 // with currentColor so the item's rarity color tints them).
 (function (root) {
   const P = {
