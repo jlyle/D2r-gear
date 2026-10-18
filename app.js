@@ -762,7 +762,9 @@
       for (const [r, n] of Object.entries(need)) for (let k = (have[r] || 0); k < n; k++) missing.push(r);
       missing.sort((a, b) => runeRank(a) - runeRank(b));
       const owned = g.runes.length - missing.length;
-      out.push({ ...g, missing, owned, hardest: missing.length ? Math.max(...missing.map(runeRank)) : -1 });
+      // How many you could make with the runes you hold (each counted on its own).
+      const qty = Math.min(...Object.entries(need).map(([r, n]) => Math.floor((have[r] || 0) / n)));
+      out.push({ ...g, missing, owned, qty, hardest: missing.length ? Math.max(...missing.map(runeRank)) : -1 });
     }
     return out;
   }
@@ -783,7 +785,7 @@
       const used = {}; // mark which of the recipe's runes you already hold
       const chips = g.runes.map((r) => { used[r] = (used[r] || 0) + 1; return chip(r, used[r] <= (have[r] || 0)); }).join("");
       return `<div class="rw-card">
-        <div class="rw-head"><span class="n-runeword rw-name">${esc(g.name)}</span>${inBuild.has(g.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}</div>
+        <div class="rw-head"><span class="n-runeword rw-name">${esc(g.name)}</span>${g.qty ? `<span class="rw-qty" title="How many you can make from your stash runes">×${g.qty} <small>can make</small></span>` : ""}${inBuild.has(g.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}</div>
         <div class="rw-runes">${chips}</div>
         <div class="notes">${esc([...g.bases].join(" · ") || "")}${g.req ? ` · lvl ${g.req}` : ""}</div>
         ${g.missing.length ? `<div class="notes rw-miss">Need: ${g.missing.map((r) => `<a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(r + " Rune")}" target="_blank" rel="noopener">${esc(r)} ↗</a>`).join(" ")}</div>` : ""}

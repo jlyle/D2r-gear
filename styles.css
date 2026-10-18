@@ -294,3 +294,5 @@ dialog h2 { font-size: 18px; }
 .rw-miss .ext { margin-right: 8px; }
 .rw-stats summary { cursor: pointer; color: var(--accent); font-size: 14px; margin-top: 4px; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.rw-qty { font: 700 14px Inter, sans-serif; color: var(--good); border: 1px solid var(--good); border-radius: 99px; padding: 1px 9px; }
+.rw-qty small { font-weight: 500; font-size: 11px; opacity: .85; }
