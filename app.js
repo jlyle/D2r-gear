@@ -1233,12 +1233,18 @@
     $(".menu").open = false;
     const a = session.acct;
     const typed = prompt(`This permanently deletes the account "${a.name}", its ${state.chars.length} character(s) and its stash from this device.\n\nType the account name to confirm:`);
-    if (typed === null || typed.trim() !== a.name) return;
+    if (typed === null) return;
+    // Phone keyboards capitalise the first letter, so compare without case.
+    if (typed.trim().toLowerCase() !== a.name.trim().toLowerCase()) {
+      alert(`"${typed.trim()}" doesn't match "${a.name}", so nothing was deleted.`);
+      return;
+    }
     await saveChain;
     accounts = accounts.filter((x) => x.id !== a.id);
     writeAccounts();
     try { purgePhotos(); } catch (e) { /* ignore */ }
     lock();
+    alert(`Account "${a.name}" was deleted from this device.`);
   };
 
   render();
