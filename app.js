@@ -146,6 +146,34 @@
 
   const SLOT_LABELS = { helm: "Helms", amulet: "Amulets", ring: "Rings", weapon: "Weapons", offhand: "Shields & off-hands", armor: "Armor", gloves: "Gloves", belt: "Belts", boots: "Boots", charm: "Charms", rune: "Runes", gem: "Gems", jewel: "Jewels & facets", misc: "Keys, organs & other" };
   const inStash = (name) => state.stash.some((s) => s.item === name);
+  // Runes, gems, keys, essences etc. stack: one stash entry with a count.
+  const STACKABLE = ["rune", "gem", "misc"];
+  const qtyOf = (e) => Math.max(1, Number(e.qty) || 1);
+  const stackable = (name) => STACKABLE.includes(byName.get(name)?.slot);
+  const stashCount = () => state.stash.reduce((n, e) => n + qtyOf(e), 0);
+  // Add to the stash; a stackable item you already hold (same notes) just goes up by one.
+  function addToStash(item, note = "") {
+    if (stackable(item)) {
+      const same = state.stash.find((e) => e.item === item && (e.note || "") === (note || ""));
+      if (same) { same.qty = qtyOf(same) + 1; same.added = Date.now(); return same.id; }
+    }
+    const id = uid();
+    state.stash.push({ id, added: Date.now(), item, note: note || "" });
+    return id;
+  }
+  // Older stashes may hold the same rune several times: fold those into one entry with a count.
+  function mergeStacks() {
+    const seen = new Map(); let changed = false;
+    state.stash = state.stash.filter((e) => {
+      if (!stackable(e.item)) return true;
+      const k = e.item + "|" + (e.note || "");
+      const first = seen.get(k);
+      if (!first) { seen.set(k, e); return true; }
+      first.qty = qtyOf(first) + qtyOf(e); first.added = Math.max(first.added || 0, e.added || 0); changed = true;
+      return false;
+    });
+    return changed;
+  }
   // Traderie search link; generic rare/crafted entries have no single listing.
   function traderieLink(it) {
     if (!it || it.type === "rare" || (it.type === "charm" && !it.unique1)) return "";
@@ -250,7 +278,7 @@
         <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option ${m === c.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
-        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["runewords", "Runewords"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
+        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${stashCount()})`], ["runewords", "Runewords"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
       ${!["upgrades", "skills", "runewords"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
       <section id="tabBody"></section>`;
@@ -720,12 +748,13 @@
   function equipFromStash(c, entry, slotKey) {
     const it = byName.get(entry.item);
     if (!it) return;
-    state.stash = state.stash.filter((x) => x !== entry);
+    if (qtyOf(entry) > 1) entry.qty = qtyOf(entry) - 1;
+    else state.stash = state.stash.filter((x) => x !== entry);
     if (it.slot === "charm") {
       c.charms.push({ id: uid(), added: Date.now(), item: it.name, note: entry.note || "" });
     } else {
       const old = c.gear[slotKey];
-      if (old?.item) state.stash.push({ id: uid(), added: Date.now(), item: old.item, note: old.note || "" });
+      if (old?.item) addToStash(old.item, old.note || "");
       c.gear[slotKey] = { item: it.name, note: entry.note || "" };
     }
     save(); render();
@@ -741,7 +770,7 @@
       const it = byName.get(e.item);
       if (it?.slot !== "rune") continue;
       const r = e.item.replace(/ Rune$/, "");
-      if (runeRank(r) >= 0) have[r] = (have[r] || 0) + 1;
+      if (runeRank(r) >= 0) have[r] = (have[r] || 0) + qtyOf(e);
     }
     return have;
   }
@@ -816,6 +845,7 @@
   }
 
   function renderStash(body, c) {
+    if (mergeStacks()) save();
     const groups = Object.keys(SLOT_LABELS);
     if (!STASH_TYPES.some(([g]) => g === stashType)) stashType = "helm";
     const ups = new Map(stashUpgrades(c).map((u) => [u.entry.id, u]));
@@ -835,6 +865,7 @@
             ${entryHTML(e, it, { noteKey: e.id })}
           </div>
           <div class="row-btns">
+            ${stackable(e.item) || qtyOf(e) > 1 ? `<div class="qty" aria-label="Quantity"><button class="btn ghost small qminus" aria-label="One fewer">−</button><span class="qn">${qtyOf(e)}</span><button class="btn ghost small qplus" aria-label="One more">+</button></div>` : ""}
             ${canEquip ? `<button class="btn small eq" data-slot="${target || ""}">Equip</button>` : ""}
             <button class="btn ghost small rm" aria-label="Remove">✕</button>
           </div>
@@ -866,7 +897,7 @@
         </details>
       </div>
       <div class="card" style="margin-top:12px">
-        ${state.stash.length ? `<label class="field stash-find"><span>Find in your stash (${state.stash.length} item${state.stash.length === 1 ? "" : "s"})</span>
+        ${state.stash.length ? `<label class="field stash-find"><span>Find in your stash (${stashCount()} item${stashCount() === 1 ? "" : "s"})</span>
           <input type="search" id="stashFind" placeholder="Name, rune, base or stat…" value="${esc(stashFind)}" autocomplete="off"></label>
           <p class="notes" id="stashNone" hidden>Nothing in your stash matches.</p>` : ""}
         ${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
@@ -893,7 +924,7 @@
       $("#addStash").value = it.name;
       $("#addStashBtn").focus();
     });
-    $("#addStashBtn").onclick = () => { const id = uid(); state.stash.push({ id, added: Date.now(), item: $("#addStash").value, note: "" }); flashId = id; save(); render(); };
+    $("#addStashBtn").onclick = () => { flashId = addToStash($("#addStash").value); save(); render(); };
     $("#cuAdd").onclick = () => {
       let name = $("#cuName").value.trim().replace(/\s+/g, " ");
       if (!name) { $("#cuErr").textContent = "Give the item a name."; return; }
@@ -910,6 +941,13 @@
     body.querySelectorAll(".charm-row").forEach((row) => {
       const e = state.stash.find((x) => x.id === row.dataset.id);
       $(".rm", row).onclick = () => { state.stash = state.stash.filter((x) => x !== e); pruneCustom(); save(); render(); };
+      const qm = $(".qminus", row), qp = $(".qplus", row);
+      if (qp) qp.onclick = () => { e.qty = qtyOf(e) + 1; save(); render(); };
+      if (qm) qm.onclick = () => {
+        if (qtyOf(e) > 1) e.qty = qtyOf(e) - 1;
+        else { state.stash = state.stash.filter((x) => x !== e); pruneCustom(); }
+        save(); render();
+      };
       const eq = $(".eq", row);
       if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
     });
@@ -1306,11 +1344,11 @@
     const it = r.item;
     if (!it) return;
     const entry = { item: it.name, note: r.note };
-    if (r.dest === "stash") state.stash.push({ id: uid(), added: Date.now(), ...entry });
+    if (r.dest === "stash") addToStash(entry.item, entry.note);
     else if (r.dest === "charms") c.charms.push({ id: uid(), added: Date.now(), ...entry });
     else {
       const old = c.gear[r.dest];
-      if (old?.item && r.move) state.stash.push({ id: uid(), added: Date.now(), item: old.item, note: old.note || "" });
+      if (old?.item && r.move) addToStash(old.item, old.note || "");
       c.gear[r.dest] = entry;
     }
     save();

@@ -296,3 +296,6 @@ dialog h2 { font-size: 18px; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .rw-qty { font: 700 14px Inter, sans-serif; color: var(--good); border: 1px solid var(--good); border-radius: 99px; padding: 1px 9px; }
 .rw-qty small { font-weight: 500; font-size: 11px; opacity: .85; }
+.qty { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 1px; }
+.qty .btn { min-width: 34px; padding: 4px 0; border: 0; font-size: 18px; line-height: 1; }
+.qty .qn { min-width: 26px; text-align: center; font-weight: 700; }
