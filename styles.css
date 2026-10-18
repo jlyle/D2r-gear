@@ -281,3 +281,16 @@ dialog h2 { font-size: 18px; }
 .stat-plan { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 10px 0 0; }
 .stat-plan dt { font-weight: 600; color: var(--accent); }
 .stat-plan dd { margin: 0; color: var(--text); }
+
+/* Runewords tab */
+.rw-card { padding: 12px 0; border-top: 1px solid var(--line); }
+.rw-card:first-of-type { border-top: 0; }
+.rw-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.rw-name { font-weight: 700; font-size: 17px; }
+.rw-runes { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 6px; }
+.rune-chip { font: 600 13px Inter, sans-serif; padding: 3px 10px; border-radius: 99px; border: 1px solid var(--line); }
+.rune-chip.have { color: var(--good); border-color: currentColor; background: rgba(95,191,106,.1); }
+.rune-chip.need { color: var(--muted); border-style: dashed; }
+.rw-miss .ext { margin-right: 8px; }
+.rw-stats summary { cursor: pointer; color: var(--accent); font-size: 14px; margin-top: 4px; }
+.seg { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }

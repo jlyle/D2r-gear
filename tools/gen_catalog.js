@@ -11,7 +11,7 @@ const MERGE = `
     const cur = have.get(k);
     // Game data is authoritative: take its type, level, base and full stats; keep the
     // curated extras (alias, fcr, merc, class, charm size) that the guides rely on.
-    if (cur) { Object.assign(cur, { type: c.type, req: c.req ?? cur.req, base: c.base || cur.base, btype: c.btype || cur.btype, set: c.set, stats: /Sunder/.test(cur.stats || "") ? cur.stats : c.stats || cur.stats }); if (c.runes) cur.runes = c.runes; continue; }
+    if (cur) { Object.assign(cur, { type: c.type, req: c.req ?? cur.req, base: c.base || cur.base, btype: c.btype || cur.btype, set: c.set, stats: /Sunder/.test(cur.stats || "") ? cur.stats : c.stats || cur.stats }); if (c.runes) cur.runes = c.runes; if (c.bases) cur.bases = c.bases; continue; }
     if (c.slot === "jewel" && /Rainbow Facet/.test(c.name)) continue;
     ITEMS.push(Object.assign({}, c));
   }
@@ -181,12 +181,18 @@ for (const r of rws) {
   const slots = new Set();
   for (let i = 1; i <= 6; i++) { const t = r[`itype${i}`]; if (t) { const sl = slotOf(t) || (t === "shld" ? "offhand" : null); if (sl) slots.add(sl); } }
   const stats = propsOf(r, "T1Code", 7, "").join(", ");
+  // Base item types the runes go into ("Body Armor", "Swords"), and ones excluded.
+  const TYPE_LABEL = { shld: "Shields", tors: "Body Armor", axe: "Axes", scep: "Scepters", hamm: "Hammers", club: "Clubs", mace: "Maces", miss: "Bows & Crossbows", weap: "Weapons", helm: "Helms", h2h: "Claws", swor: "Swords", pole: "Polearms", mele: "Melee Weapons", pala: "Paladin Shields", staf: "Staves", spea: "Spears", knif: "Daggers", grim: "Grimoires", head: "Necromancer Heads", ashd: "Paladin Shields", wand: "Wands" };
+  const okTypes = [], noTypes = [];
+  for (let i = 1; i <= 6; i++) if (r[`itype${i}`]) okTypes.push(TYPE_LABEL[r[`itype${i}`]] || r[`itype${i}`]);
+  for (let i = 1; i <= 3; i++) if (r[`etype${i}`]) noTypes.push(TYPE_LABEL[r[`etype${i}`]] || r[`etype${i}`]);
+  const baseText = `${runes.length}-socket ${[...new Set(okTypes)].join(" / ")}${noTypes.length ? ` (not ${[...new Set(noTypes)].join(" / ")})` : ""}`;
   const list = [...slots];
   const label = { weapon: "weapon", offhand: "shield", armor: "armor", helm: "helm" };
   for (const sl of list) {
     const rwName = STR[r.Name] || r["*Rune Name"];
     const name = list.length > 1 ? `${rwName} (${label[sl] || sl})` : rwName;
-    out.push({ name, type: "runeword", slot: sl, req: req || undefined, runes: runes.join(" "), stats });
+    out.push({ name, type: "runeword", slot: sl, req: req || undefined, runes: runes.join(" "), bases: baseText, stats });
   }
 }
 const seen = new Set();

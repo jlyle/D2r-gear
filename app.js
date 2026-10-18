@@ -250,9 +250,9 @@
         <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option ${m === c.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
-        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
+        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${state.stash.length})`], ["runewords", "Runewords"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
-      ${!["upgrades", "skills"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
+      ${!["upgrades", "skills", "runewords"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
       <section id="tabBody"></section>`;
 
     $("#fName").oninput = (e) => { c.name = e.target.value; save(); renderRoster(); };
@@ -278,6 +278,7 @@
     else if (tab === "charms") renderCharms(body, c);
     else if (tab === "stash") renderStash(body, c);
     else if (tab === "skills") renderSkills(body, c);
+    else if (tab === "runewords") renderRunewords(body, c);
     else renderUpgrades(body, c);
   }
 
@@ -728,6 +729,88 @@
       c.gear[slotKey] = { item: it.name, note: entry.note || "" };
     }
     save(); render();
+  }
+
+  // ---------- runewords from the runes in the shared stash ----------
+  const RUNE_ORDER = ["El", "Eld", "Tir", "Nef", "Eth", "Ith", "Tal", "Ral", "Ort", "Thul", "Amn", "Sol", "Shael", "Dol", "Hel", "Io", "Lum", "Ko", "Fal", "Lem", "Pul", "Um", "Mal", "Ist", "Gul", "Vex", "Ohm", "Lo", "Sur", "Ber", "Jah", "Cham", "Zod"];
+  const runeRank = (r) => RUNE_ORDER.indexOf(r);
+  let rwFilter = "all";
+  function stashRunes() {
+    const have = {};
+    for (const e of state.stash) {
+      const it = byName.get(e.item);
+      if (it?.slot !== "rune") continue;
+      const r = e.item.replace(/ Rune$/, "");
+      if (runeRank(r) >= 0) have[r] = (have[r] || 0) + 1;
+    }
+    return have;
+  }
+  // One entry per runeword (Fortitude weapon/armor share runes), with what's missing.
+  function runewordStatus(have) {
+    const groups = new Map();
+    for (const it of ITEMS) {
+      if (it.type !== "runeword" || !it.runes) continue;
+      const name = it.name.replace(/ \((sword|shield|helm|weapon|armor)\)$/, "");
+      const g = groups.get(name) || { name, items: [], runes: it.runes.split(" "), bases: new Set(), req: it.req };
+      g.items.push(it); if (it.bases) g.bases.add(it.bases);
+      groups.set(name, g);
+    }
+    const out = [];
+    for (const g of groups.values()) {
+      const need = {}; g.runes.forEach((r) => (need[r] = (need[r] || 0) + 1));
+      const missing = [];
+      for (const [r, n] of Object.entries(need)) for (let k = (have[r] || 0); k < n; k++) missing.push(r);
+      missing.sort((a, b) => runeRank(a) - runeRank(b));
+      const owned = g.runes.length - missing.length;
+      out.push({ ...g, missing, owned, hardest: missing.length ? Math.max(...missing.map(runeRank)) : -1 });
+    }
+    return out;
+  }
+  function renderRunewords(body, c) {
+    const have = stashRunes();
+    const total = Object.values(have).reduce((a, b) => a + b, 0);
+    const b = buildOf(c);
+    const inBuild = new Set(b ? Object.values(b.tiers).flat(2).map((n) => String(n).replace(/ \((sword|shield|helm|weapon|armor)\)$/, "")) : []);
+    let all = runewordStatus(have);
+    if (rwFilter === "build") all = all.filter((g) => inBuild.has(g.name));
+    const ready = all.filter((g) => !g.missing.length).sort((x, y) => (inBuild.has(y.name) - inBuild.has(x.name)) || (y.req || 0) - (x.req || 0));
+    // "Close": you own at least half the runes and are missing at most two.
+    const close = all.filter((g) => g.missing.length && g.missing.length <= 2 && g.owned >= Math.ceil(g.runes.length / 2))
+      .sort((x, y) => x.missing.length - y.missing.length || (inBuild.has(y.name) - inBuild.has(x.name)) || x.hardest - y.hardest);
+    const chip = (r, ok) => `<span class="rune-chip ${ok ? "have" : "need"}">${esc(r)}</span>`;
+    const card = (g) => {
+      const it = g.items[0];
+      const used = {}; // mark which of the recipe's runes you already hold
+      const chips = g.runes.map((r) => { used[r] = (used[r] || 0) + 1; return chip(r, used[r] <= (have[r] || 0)); }).join("");
+      return `<div class="rw-card">
+        <div class="rw-head"><span class="n-runeword rw-name">${esc(g.name)}</span>${inBuild.has(g.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}</div>
+        <div class="rw-runes">${chips}</div>
+        <div class="notes">${esc([...g.bases].join(" · ") || "")}${g.req ? ` · lvl ${g.req}` : ""}</div>
+        ${g.missing.length ? `<div class="notes rw-miss">Need: ${g.missing.map((r) => `<a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(r + " Rune")}" target="_blank" rel="noopener">${esc(r)} ↗</a>`).join(" ")}</div>` : ""}
+        <details class="rw-stats"><summary>Stats</summary><ul class="tip-stats">${statLines(it.stats).map((l) => `<li>${esc(l)}</li>`).join("")}</ul></details>
+      </div>`;
+    };
+    body.innerHTML = `
+      <div class="card">
+        <h3>Runes in your stash</h3>
+        ${total ? `<div class="rw-runes">${RUNE_ORDER.filter((r) => have[r]).map((r) => `<span class="rune-chip have">${r}${have[r] > 1 ? ` ×${have[r]}` : ""}</span>`).join("")}</div>
+          <p class="notes">${total} rune${total === 1 ? "" : "s"}. Add or remove runes on the Stash tab (Gear type: Rune).</p>`
+        : `<p class="notes">No runes in your stash yet. Add them on the Stash tab (Gear type: Rune) and this page shows what you can make.</p>`}
+        <div class="seg" role="group" aria-label="Which runewords">
+          <button class="btn small ${rwFilter === "all" ? "" : "ghost"}" data-rwf="all">All runewords</button>
+          <button class="btn small ${rwFilter === "build" ? "" : "ghost"}" data-rwf="build" ${b ? "" : "disabled"}>${b ? `Only ${esc(b.name)}` : "No build picked"}</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Ready to make (${ready.length})</h3>
+        ${ready.length ? ready.map(card).join("") : `<p class="notes">${total ? "Nothing complete yet — see what you're close to below." : "Add runes to see what you can make."}</p>`}
+      </div>
+      <div class="card" style="margin-top:12px">
+        <h3>Almost there (${close.length})</h3>
+        <p class="notes" style="margin-top:4px">Missing one or two runes, with at least half the recipe in your stash. Easiest to finish first.</p>
+        ${close.length ? close.map(card).join("") : `<p class="notes">Nothing within two runes yet.</p>`}
+      </div>`;
+    body.querySelectorAll("[data-rwf]").forEach((btn) => (btn.onclick = () => { rwFilter = btn.dataset.rwf; render(); }));
   }
 
   function renderStash(body, c) {
