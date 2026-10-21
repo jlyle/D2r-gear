@@ -8,7 +8,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 
 ## Features
 - Password-protected accounts, each with up to 10 characters and its own shared stash. Data is encrypted (AES-GCM, PBKDF2 key) and stored in the browser only; a forgotten password can't be recovered.
-- Export account backup (still encrypted) / Import to move an account between devices
+- Export an encrypted backup of a whole account (all characters, gear, stats and stash) and restore it on any device. See **Back up and restore your data** below.
 - Slot-by-slot gear picker with uniques, sets, runewords and common rare/crafted types, plus item search (name, nickname or rune recipe)
 - Mercenary weapon, helm and armor
 - Charm inventory with 10×4 cell usage and duplicate-unique warnings
@@ -58,6 +58,33 @@ Runes live in the shared stash like any other item, so every character on the ac
 - **All rune recipes** — a collapsible reference of the full El → Zod chain.
 
 Each recipe is counted on its own, so two recipes that need the same gem can both show as available — cube one and the other updates.
+
+## Back up and restore your data
+**⚠️ Your characters exist only in this browser on this device.** Nothing is sent to a server, so there's no cloud copy and no account recovery. If you clear your browser data, uninstall the browser, use a private window, switch phones, or forget your password, the data is gone unless you have a backup. **Export a backup regularly**, and always before you clear site data or change devices.
+
+### What a backup contains
+- One file covers **one whole account**: all its characters (up to 10), each character's gear, mercenary, charms, build and actual stats, plus the account's shared stash and custom items.
+- It does **not** contain any photos, because photos are never kept.
+- The file stays **encrypted** with the account's password (AES-GCM, PBKDF2-SHA-256 key). It's safe to keep in cloud storage or email to yourself, but without the password nobody can open it, including you.
+- If you have several accounts (e.g. Ladder and Hardcore), export each one separately.
+
+### Exporting
+- **Step 1:** Unlock the account.
+- **Step 2:** Open the **⋯** menu and tap **Export account backup**.
+- **Step 3:** A file named like `perfect-roll-Ladder-2026-10-21.json` downloads. On a phone, it goes to your Downloads folder.
+- **Step 4:** Move it somewhere safe: Google Drive, OneDrive, email, a USB stick. Its name includes the date, so you can keep several and know which is newest.
+
+### Restoring
+- **On a new device or after clearing data:** open the site. On the sign-in screen, use **Restore → Import account backup**, pick the `.json` file, then unlock it with its password.
+- **While you're signed in:** open **⋯ → Import backup**. The current account locks, and the restored one appears in the account list.
+- A restore **adds a new account**. It never overwrites an existing one. If the name is already taken, the restored copy is named, for example, `Ladder (2)`. You can check it, then delete whichever copy you don't need.
+- Older single-list backups from before accounts existed are **merged** into the account you have unlocked. Characters and stash items already there are skipped, and only as many characters as fit under the 10-character limit are added.
+
+### Things that catch people out
+- **Passwords are tied to the backup.** A backup opens with the password the account had *when you exported it*. If you use **Change password**, older backups still need the old password, so export a fresh backup right after changing it.
+- **Deleting is permanent.** **Delete account** and **Delete character** can't be undone. Export first if there's any doubt.
+- **Each browser keeps its own data.** Chrome and Firefox on the same computer, or the website and an installed app, don't share data. Use export and restore to move between them.
+- **Storage full or blocked.** If the site says it couldn't save, export immediately so you don't lose what's on screen.
 
 ## Screenshots
 **Upgrades:** stash items that beat what you're wearing come first, then the FCR breakpoint check and charms still to get.
