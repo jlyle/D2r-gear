@@ -66,8 +66,10 @@ The **Terror Zones** tab shows what's terrorized now and next, and how well the 
 **Single player** works on its own: the app runs the game's offline rotation (the same 30-minute schedule the game uses, verified against published schedules), so it needs no server or token. It shows the current zone with a countdown, the next zone, and the rest of the day under **Later today**. In the game, turn on **Enable Terror Zones** in the offline game settings; a difficulty unlocks once you've killed Baal on it.
 
 **Online (Battle.net)** zones can't be predicted, so they come from what players report to [D2RuneWizard](https://d2runewizard.com/terror-zone-tracker). To turn it on:
-- **Step 1:** Request your own free API token from D2RuneWizard (see [d2runewizard.com/integration](https://d2runewizard.com/integration)).
-- **Step 2:** On the Terror Zones tab, paste the token and a contact email (D2RuneWizard's API requires one), then tap **Save token**. Both are stored encrypted in your account, and the email is only sent to D2RuneWizard.
+- **Step 1:** On the Terror Zones tab, enter a contact email (D2RuneWizard's API asks for one) and tap **Turn on online zones**.
+- **Step 2 (if needed):** If D2RuneWizard gave you an API token, paste it in too. Their [integration page](https://d2runewizard.com/integration) doesn't say how to get one; ask on their Discord or with the form on that page.
+
+The email and token are stored encrypted in your account and only sent to D2RuneWizard.
 
 The next online zone isn't published ahead of time, so the card shows a countdown to the switch and picks up the new zone once players report it.
 

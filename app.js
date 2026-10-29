@@ -1156,7 +1156,7 @@
 
   // ---------- Terror Zones ----------
   // Single player: computed on this device from the game's own rotation (terrorzones.js), no internet needed.
-  // Online: the zone players report to D2RuneWizard, fetched with the user's own API token.
+  // Online: the zone players report to D2RuneWizard, fetched with the user's contact email (and API token, if they have one).
   const TZ_API = "https://d2runewizard.com/api/trackers/terror-zone";
   const TZ_SOURCE = "https://d2runewizard.com/terror-zone-tracker";
   const TZ_REPO = "https://github.com/jlyle/D2r-gear";
@@ -1203,11 +1203,11 @@
   }
   async function fetchOnlineTZ(force) {
     const cfg = state.tz || {};
-    if (!cfg.token || tzOnline.loading) return;
+    if (!(cfg.token || cfg.contact) || tzOnline.loading) return;
     if (!force && Date.now() - tzOnline.at < 60000) return; // D2RuneWizard asks for no faster than its cache (30-60s)
     tzOnline.loading = true;
     try {
-      const res = await fetch(`${TZ_API}?token=${encodeURIComponent(cfg.token)}`, {
+      const res = await fetch(cfg.token ? `${TZ_API}?token=${encodeURIComponent(cfg.token)}` : TZ_API, {
         headers: { "D2R-Contact": cfg.contact || "", "D2R-Platform": "Web", "D2R-Repo": TZ_REPO },
       });
       const body = await res.json().catch(() => null);
@@ -1223,12 +1223,12 @@
     const cfg = state.tz || {};
     const now = Date.now(), sw = TZ.nextSwitch(now);
     const credit = `<div class="notes">Online zones are reported by players to <a href="${TZ_SOURCE}" target="_blank" rel="noopener">D2RuneWizard</a>.</div>`;
-    if (!cfg.token) return `<div class="card tz-card"><h3>Online (Battle.net)</h3>
-      <p class="notes">Online zones change every 30 minutes and can't be worked out ahead of time, so they come from players' reports. Add your own free D2RuneWizard API token to see the current zone here.</p>
+    if (!cfg.token && !cfg.contact) return `<div class="card tz-card"><h3>Online (Battle.net)</h3>
+      <p class="notes">Online zones change every 30 minutes and can't be worked out ahead of time, so they come from players' reports. Turn it on with a contact email; D2RuneWizard's API asks for one. Add an API token too if they gave you one.</p>
       <form class="stack tz-setup" id="tzSetup">
-        <label class="field"><span>API token</span><input type="password" id="tzToken" autocomplete="off" placeholder="From d2runewizard.com/integration"></label>
-        <label class="field"><span>Contact email (sent to D2RuneWizard, required by their API)</span><input type="text" id="tzContact" inputmode="email" autocomplete="email"></label>
-        <button class="btn">Save token</button>
+        <label class="field"><span>API token (optional)</span><input type="password" id="tzToken" autocomplete="off" placeholder="Leave blank if you don't have one"></label>
+        <label class="field"><span>Contact email (only sent to D2RuneWizard)</span><input type="email" id="tzContact" autocomplete="email" required></label>
+        <button class="btn">Turn on online zones</button>
       </form>${credit}</div>`;
     const tzd = tzOnline.data?.terrorZone;
     const hp = tzd?.highestProbabilityZone;
@@ -1248,7 +1248,7 @@
       <div class="tz-label">Next · switches in <span data-until="${sw}">${countdown(sw - now)}</span></div>
       ${nextZone ? zoneHTML(nextZone, c, { full: false }) : `<div class="notes">Online zones aren't published ahead of time; the next one shows here once players report it after ${hhmm(sw)}.</div>`}
       ${tzOnline.error && hp ? `<p class="err">${esc(tzOnline.error)}</p>` : ""}
-      <div class="row-btns"><button class="btn ghost small" id="tzRefresh"${tzOnline.loading ? " disabled" : ""}>Refresh</button><button class="btn ghost small" id="tzForget">Remove token</button></div>
+      <div class="row-btns"><button class="btn ghost small" id="tzRefresh"${tzOnline.loading ? " disabled" : ""}>Refresh</button><button class="btn ghost small" id="tzForget">Turn off</button></div>
       ${credit}</div>`;
   }
   function renderTerror(body, c) {
@@ -1286,7 +1286,7 @@
     if (setup) setup.onsubmit = (e) => {
       e.preventDefault();
       const token = $("#tzToken", body).value.trim(), contact = $("#tzContact", body).value.trim();
-      if (!token) return;
+      if (!contact) return;
       state.tz = { token, contact };
       tzOnline = { at: 0, data: null, error: "", loading: false };
       save(); render();
@@ -1294,7 +1294,7 @@
     const rf = $("#tzRefresh", body);
     if (rf) rf.onclick = () => fetchOnlineTZ(true);
     const fg = $("#tzForget", body);
-    if (fg) fg.onclick = () => { if (!confirm("Remove your D2RuneWizard token from this account?")) return; delete state.tz; tzOnline = { at: 0, data: null, error: "", loading: false }; save(); render(); };
+    if (fg) fg.onclick = () => { if (!confirm("Turn off online zones and remove your D2RuneWizard email and token from this account?")) return; delete state.tz; tzOnline = { at: 0, data: null, error: "", loading: false }; save(); render(); };
 
     fetchOnlineTZ(false);
     // Tick the countdowns; re-render at a switch, and re-check the online report every 2 minutes.
