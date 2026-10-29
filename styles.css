@@ -319,3 +319,37 @@ dialog h2 { font-size: 18px; }
 .cube-ref summary { cursor: pointer; color: var(--accent); font-weight: 600; }
 .cube-ref-row { font-size: 14px; padding: 3px 0; color: var(--muted); } .cube-ref-row b { color: var(--text); }
 .cube-meta { font-size: 14px; color: var(--muted); }
+
+/* ---------- Terror Zones ---------- */
+.tz-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
+.tz-card { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.tz-card h3 { margin-bottom: 2px; }
+.tz-card .notes { margin-top: 0; }
+.tz-label { font: 600 11px Inter, sans-serif; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.tz-label span { color: var(--accent); text-transform: none; letter-spacing: 0; }
+.tz-zone { background: var(--panel-2); border-radius: 8px; padding: 10px 12px; display: grid; gap: 6px; }
+.tz-title { display: flex; gap: 8px; justify-content: space-between; align-items: flex-start; }
+.tz-title b { font-family: Cinzel, Georgia, serif; font-size: 16px; }
+.notes-inline { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.tz-fit { font-size: 13px; }
+.tz-hint { color: var(--warn); }
+.tz-areas { font-size: 12px; }
+.tz-imm { display: flex; flex-wrap: wrap; gap: 4px; }
+.imm { font: 600 11px Inter, sans-serif; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line); color: var(--muted); }
+.imm-f { color: #e8774a; border-color: #e8774a; }
+.imm-c { color: #6fb6e8; border-color: #6fb6e8; }
+.imm-l { color: #e6d35c; border-color: #e6d35c; }
+.imm-p { color: #6fcf5a; border-color: #6fcf5a; }
+.imm-d { color: #c9b9a3; border-color: #c9b9a3; }
+.imm-m { color: #c38bf0; border-color: #c38bf0; }
+.badge.g-great { color: var(--good); border-color: var(--good); white-space: nowrap; }
+.badge.g-ok { color: var(--warn); border-color: var(--warn); white-space: nowrap; }
+.badge.g-tough { color: var(--bad); border-color: var(--bad); white-space: nowrap; }
+.tz-intro { margin: 0 0 12px; }
+.tz-later summary { cursor: pointer; list-style: none; }
+.tz-later summary::-webkit-details-marker { display: none; }
+.tz-later summary h3::after { content: " ▾"; color: var(--muted); font-size: 14px; }
+.tz-later[open] summary h3::after { content: " ▴"; }
+.tz-setup { margin-top: 0; }
+@media (max-width: 420px) { .tz-grid { grid-template-columns: 1fr; } }
+.tz-card a:not(.ext) { color: var(--accent); }

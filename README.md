@@ -21,6 +21,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 - Gems & Cube tab: gem inventory by grade, Horadric Cube rune and gem upgrades you can do right now
 - Skills tab: suggested skill point order and amounts plus stat points for all 40 builds
 - Upgrades tab: stash upgrades first, then per-slot suggestions with Traderie links, FCR breakpoint check for caster builds, missing charms
+- Terror Zones tab: current and next zone for single player (worked out on your device) and online (player reports via D2RuneWizard), each rated for your character's build, sunder charms and Infinity merc
 
 ## Recording your item's actual stats
 Every item you own — worn, on the merc, in the charm inventory or in the shared stash — shows two blocks: **Typical stats** (what the item can roll, from the game data) and **Actual stats** (the rolls on *your* copy). Actual stats are optional, but they're what tells a 15% Enigma from a perfect one when you're comparing or trading.
@@ -58,6 +59,25 @@ Runes live in the shared stash like any other item, so every character on the ac
 - **All rune recipes** — a collapsible reference of the full El → Zod chain.
 
 Each recipe is counted on its own, so two recipes that need the same gem can both show as available — cube one and the other updates.
+
+## Terror Zones
+The **Terror Zones** tab shows what's terrorized now and next, and how well the current character can handle it.
+
+**Single player** works on its own: the app runs the game's offline rotation (the same 30-minute schedule the game uses, verified against published schedules), so it needs no server or token. It shows the current zone with a countdown, the next zone, and the rest of the day under **Later today**. In the game, turn on **Enable Terror Zones** in the offline game settings; a difficulty unlocks once you've killed Baal on it.
+
+**Online (Battle.net)** zones can't be predicted, so they come from what players report to [D2RuneWizard](https://d2runewizard.com/terror-zone-tracker). To turn it on:
+- **Step 1:** Request your own free API token from D2RuneWizard (see [d2runewizard.com/integration](https://d2runewizard.com/integration)).
+- **Step 2:** On the Terror Zones tab, paste the token and a contact email (D2RuneWizard's API requires one), then tap **Save token**. Both are stored encrypted in your account, and the email is only sent to D2RuneWizard.
+
+The next online zone isn't published ahead of time, so the card shows a countdown to the switch and picks up the new zone once players report it.
+
+**Ratings** compare each zone's Hell monster types with your build's damage type:
+- **Clear it all** — nothing there is immune to you. **Mostly fine** — at least 85% of monster types. **Tough** — more than that are immune.
+- A sunder charm in your charm inventory (Cold Rupture, Flame Rift, Crack of the Heavens, Rotting Fissure, Bone Break, Black Cleft) counts as breaking that immunity, and **Infinity** on your mercenary breaks fire, cold and lightning immunities under 117%.
+- When a missing sunder charm would help, the zone says how many monster types it would open up, with a Traderie link.
+- Champions and uniques can roll extra immunities, so treat the rating as a guide.
+
+The zone list and immunities come from the game's own data files; `tools/gen_terrorzones.py` regenerates them after a patch.
 
 ## Back up and restore your data
 **⚠️ Your characters exist only in this browser on this device.** Nothing is sent to a server, so there's no cloud copy and no account recovery. If you clear your browser data, uninstall the browser, use a private window, switch phones, or forget your password, the data is gone unless you have a backup. **Export a backup regularly**, and always before you clear site data or change devices.

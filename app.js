@@ -87,7 +87,7 @@
     const snapshot = JSON.parse(JSON.stringify(state));
     saveChain = saveChain.then(async () => { await sealInto(acct, key, snapshot); writeAccounts(); }).catch(() => {});
   }
-  function lock() { unregisterCustom(); session = null; state = null; pickedAcct = null; tab = "gear"; render(); }
+  function lock() { unregisterCustom(); tzOnline = { at: 0, data: null, error: "", loading: false }; session = null; state = null; pickedAcct = null; tab = "gear"; render(); }
 
   // ---------- old photo cleanup ----------
   // Photos used to be stored with items; they no longer are. Remove any left in
@@ -257,6 +257,7 @@
 
   // ---------- render ----------
   function render() {
+    if (tzTimer) { clearInterval(tzTimer); tzTimer = null; }
     document.body.classList.toggle("locked", !session);
     if (!session) { $("#acctName").textContent = "D2R inventory & upgrades"; renderLogin(); return; }
     renderRoster();
@@ -278,9 +279,9 @@
         <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option ${m === c.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
-        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${stashCount()})`], ["runewords", "Runewords"], ["cube", "Gems & Cube"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
+        ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${stashCount()})`], ["runewords", "Runewords"], ["cube", "Gems & Cube"], ["skills", "Skills"], ["upgrades", "Upgrades"], ["tz", "Terror Zones"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
       </nav>
-      ${!["upgrades", "skills", "runewords", "cube"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
+      ${!["upgrades", "skills", "runewords", "cube", "tz"].includes(tab) ? `<div class="scan-row"><label class="btn scan-btn">📷 Take photo of gear<input type="file" id="scanCam" accept="image/*" capture="environment"></label><label class="btn ghost scan-btn">🖼 From gallery<input type="file" id="scanInput" accept="image/*" multiple></label><span class="notes">Point at the item tooltip in the game — straight on, whole box in frame.</span></div>` : ""}
       <section id="tabBody"></section>`;
 
     $("#fName").oninput = (e) => { c.name = e.target.value; save(); renderRoster(); };
@@ -300,6 +301,10 @@
       if (si) si.onchange = (e) => { const files = [...e.target.files]; e.target.value = ""; scanPhotos(c, files); };
     });
 
+    // Keep the open tab in view in the scrolling tab bar (phones).
+    const nav = $(".tabs"), selTab = nav && $(".tab[aria-selected=true]", nav);
+    if (selTab && (selTab.offsetLeft < nav.scrollLeft || selTab.offsetLeft + selTab.offsetWidth > nav.scrollLeft + nav.clientWidth)) nav.scrollLeft = selTab.offsetLeft - 16;
+
     const body = $("#tabBody");
     if (tab === "gear") renderSlots(body, c, GEAR_SLOTS);
     else if (tab === "merc") renderSlots(body, c, MERC_SLOTS);
@@ -308,6 +313,7 @@
     else if (tab === "skills") renderSkills(body, c);
     else if (tab === "runewords") renderRunewords(body, c);
     else if (tab === "cube") renderCube(body, c);
+    else if (tab === "tz") renderTerror(body, c);
     else renderUpgrades(body, c);
   }
 
@@ -1146,6 +1152,161 @@
     });
     const ef = $("#extraFcr");
     if (ef) ef.onchange = (e) => { c.extraFcr = Number(e.target.value) || 0; save(); render(); };
+  }
+
+  // ---------- Terror Zones ----------
+  // Single player: computed on this device from the game's own rotation (terrorzones.js), no internet needed.
+  // Online: the zone players report to D2RuneWizard, fetched with the user's own API token.
+  const TZ_API = "https://d2runewizard.com/api/trackers/terror-zone";
+  const TZ_SOURCE = "https://d2runewizard.com/terror-zone-tracker";
+  const TZ_REPO = "https://github.com/jlyle/D2r-gear";
+  let tzTimer = null;
+  let tzOnline = { at: 0, data: null, error: "", loading: false };
+  const GRADE = { great: ["Clear it all", "g-great"], ok: ["Mostly fine", "g-ok"], tough: ["Tough", "g-tough"], unknown: ["No build", ""] };
+  const hhmm = (ms) => new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  function countdown(ms) {
+    const s = Math.max(0, Math.round(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+    return h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m}m ${String(r).padStart(2, "0")}s`;
+  }
+  function tzBreakers(c) {
+    const have = new Set(c.charms.map((ch) => ch.item));
+    const sunder = new Set(Object.entries(TZ.SUNDERS).filter(([, n]) => have.has(n)).map(([k]) => k));
+    return { sunder, infinity: c.gear.merc_weapon?.item === "Infinity" };
+  }
+  // Sunder charms the character lacks, with how many of this zone's blocked monster types each would open up.
+  function sunderHints(zone, els, br) {
+    const out = [];
+    for (const e of els) {
+      if (br.sunder.has(e)) continue;
+      const withIt = { sunder: new Set([...br.sunder, e]), infinity: br.infinity };
+      const before = TZ.rate(zone, els.join(""), br).blocked.length, after = TZ.rate(zone, els.join(""), withIt).blocked.length;
+      if (after < before) out.push({ name: TZ.SUNDERS[e], n: before - after });
+    }
+    return out.sort((a, b) => b.n - a.n);
+  }
+  function zoneHTML(zone, c, opts = {}) {
+    if (!zone) return `<div class="tz-zone"><div class="notes">${esc(opts.empty || "Unknown zone")}</div></div>`;
+    const els = [...(BUILD_DAMAGE[c.build] || "")];
+    const br = tzBreakers(c);
+    const r = TZ.rate(zone, els.join(""), br);
+    const [label, cls] = GRADE[r.grade];
+    const imm = TZ.immunitySummary(zone);
+    const hints = r.blocked.length ? sunderHints(zone, els, br) : [];
+    return `<div class="tz-zone">
+      <div class="tz-title"><div><b>${esc(zone.name)}</b> <span class="notes-inline">Act ${zone.act}</span></div>${els.length ? `<span class="badge ${cls}">${label}</span>` : ""}</div>
+      ${opts.when ? `<div class="notes tz-when">${opts.when}</div>` : ""}
+      ${els.length ? `<div class="tz-fit">You can hurt ${r.total - r.blocked.length} of ${r.total} monster types here${r.blocked.length ? ` · immune to you: ${esc(r.blocked.map((m) => m.name).join(", "))}` : ""}</div>` : ""}
+      ${hints.length ? `<div class="notes tz-hint">${hints.map((h) => `${esc(h.name)} would open up ${h.n} of them${byName.get(h.name) ? " · " + traderieLink(byName.get(h.name)) : ""}`).join("<br>")}</div>` : ""}
+      ${opts.full !== false ? `<div class="tz-imm">${imm.length ? imm.map(([k, n]) => `<span class="imm imm-${k}">${TZ.ELEMENTS[k]} ${n}</span>`).join("") : `<span class="imm">No immunes</span>`}</div>
+      <div class="notes tz-areas">${esc(zone.areas.join(" · "))}</div>` : ""}
+    </div>`;
+  }
+  async function fetchOnlineTZ(force) {
+    const cfg = state.tz || {};
+    if (!cfg.token || tzOnline.loading) return;
+    if (!force && Date.now() - tzOnline.at < 60000) return; // D2RuneWizard asks for no faster than its cache (30-60s)
+    tzOnline.loading = true;
+    try {
+      const res = await fetch(`${TZ_API}?token=${encodeURIComponent(cfg.token)}`, {
+        headers: { "D2R-Contact": cfg.contact || "", "D2R-Platform": "Web", "D2R-Repo": TZ_REPO },
+      });
+      const body = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(body?.message || body?.error || `D2RuneWizard answered ${res.status}`);
+      tzOnline = { at: Date.now(), data: body, error: "", loading: false };
+    } catch (e) {
+      tzOnline = { at: Date.now(), data: tzOnline.data, loading: false,
+        error: e instanceof TypeError ? "Couldn't reach D2RuneWizard from here (offline, or the site refused the request)." : e.message };
+    }
+    if (tab === "tz") render();
+  }
+  function onlineCardHTML(c) {
+    const cfg = state.tz || {};
+    const now = Date.now(), sw = TZ.nextSwitch(now);
+    const credit = `<div class="notes">Online zones are reported by players to <a href="${TZ_SOURCE}" target="_blank" rel="noopener">D2RuneWizard</a>.</div>`;
+    if (!cfg.token) return `<div class="card tz-card"><h3>Online (Battle.net)</h3>
+      <p class="notes">Online zones change every 30 minutes and can't be worked out ahead of time, so they come from players' reports. Add your own free D2RuneWizard API token to see the current zone here.</p>
+      <form class="stack tz-setup" id="tzSetup">
+        <label class="field"><span>API token</span><input type="password" id="tzToken" autocomplete="off" placeholder="From d2runewizard.com/integration"></label>
+        <label class="field"><span>Contact email (sent to D2RuneWizard, required by their API)</span><input type="text" id="tzContact" inputmode="email" autocomplete="email"></label>
+        <button class="btn">Save token</button>
+      </form>${credit}</div>`;
+    const tzd = tzOnline.data?.terrorZone;
+    const hp = tzd?.highestProbabilityZone;
+    const zone = hp ? TZ.matchName(hp.zone, hp.act) : null;
+    const reportedAt = tzd?.lastUpdate?.seconds ? tzd.lastUpdate.seconds * 1000 : 0;
+    const slotStart = sw - 30 * 60000;
+    const stale = reportedAt && reportedAt < slotStart;
+    const nextName = tzOnline.data?.nextTerrorZone?.zone || tzd?.nextTerrorZone?.zone || tzd?.nextTerrorZone?.highestProbabilityZone?.zone;
+    const nextZone = nextName ? TZ.matchName(nextName, tzOnline.data?.nextTerrorZone?.act || tzd?.nextTerrorZone?.act) : null;
+    let current;
+    if (tzOnline.loading && !tzd) current = `<div class="notes">Loading…</div>`;
+    else if (!hp) current = zoneHTML(null, c, { empty: tzOnline.error || "No report yet." });
+    else if (stale) current = `<div class="tz-zone"><div class="notes">No one has reported the zone since the ${hhmm(slotStart)} switch yet. Check back in a minute, or run <code>/terrorized</code> in game.</div></div>`;
+    else current = zoneHTML(zone, c, { when: `${hp.probability ? Math.round(hp.probability > 1 ? hp.probability : hp.probability * 100) + "% of reports" : "Reported"}${reportedAt ? ` · ${hhmm(reportedAt)}` : ""}${zone ? "" : ` · “${esc(hp.zone)}”`}` });
+    return `<div class="card tz-card"><h3>Online (Battle.net)</h3>
+      <div class="tz-label">Now</div>${current}
+      <div class="tz-label">Next · switches in <span data-until="${sw}">${countdown(sw - now)}</span></div>
+      ${nextZone ? zoneHTML(nextZone, c, { full: false }) : `<div class="notes">Online zones aren't published ahead of time; the next one shows here once players report it after ${hhmm(sw)}.</div>`}
+      ${tzOnline.error && hp ? `<p class="err">${esc(tzOnline.error)}</p>` : ""}
+      <div class="row-btns"><button class="btn ghost small" id="tzRefresh"${tzOnline.loading ? " disabled" : ""}>Refresh</button><button class="btn ghost small" id="tzForget">Remove token</button></div>
+      ${credit}</div>`;
+  }
+  function renderTerror(body, c) {
+    const now = Date.now();
+    const sp = TZ.spWindows(now, 13);
+    const b = buildOf(c);
+    const els = [...(BUILD_DAMAGE[c.build] || "")];
+    const br = tzBreakers(c);
+    const breakNotes = [...[...br.sunder].map((k) => TZ.SUNDERS[k]), ...(br.infinity ? ["Infinity on your merc"] : [])];
+    body.innerHTML = `
+      <div class="card notes tz-intro">
+        ${b && els.length ? `Rated for <b>${esc(c.name)}</b> — ${esc(b.name)} (${els.map((e) => TZ.ELEMENTS[e]).join(" + ")} damage)${breakNotes.length ? `, with ${esc(breakNotes.join(" and "))} breaking immunities` : ""}. ` : "Pick a build to rate zones for this character. "}
+        Ratings use Hell monsters; champions and uniques can roll extra immunities.
+      </div>
+      <div class="summary tz-grid">
+        ${onlineCardHTML(c)}
+        <div class="card tz-card"><h3>Single player</h3>
+          <div class="tz-label">Now · ends in <span data-until="${sp[0].end}">${countdown(sp[0].end - now)}</span></div>
+          ${zoneHTML(sp[0].zone, c)}
+          <div class="tz-label">Next · ${hhmm(sp[1].start)}</div>
+          ${zoneHTML(sp[1].zone, c)}
+          <div class="notes">Worked out on this device from the game's own schedule — no server or token needed. Turn on <b>Enable Terror Zones</b> in the game's offline settings; a difficulty unlocks once you've killed Baal on it.</div>
+        </div>
+      </div>
+      <details class="card tz-later">
+        <summary><h3>Later today in single player</h3></summary>
+        <ul class="sugg">${sp.slice(2).map((w) => {
+          const r = TZ.rate(w.zone, els.join(""), br);
+          const [label, cls] = GRADE[r.grade];
+          return `<li><div><b>${hhmm(w.start)}</b> ${esc(w.zone.name)} <span class="notes-inline">Act ${w.zone.act}</span>${r.blocked.length ? `<div class="s-stats">Immune to you: ${esc(r.blocked.map((m) => m.name).join(", "))}</div>` : ""}</div>${els.length ? `<span class="badge ${cls}">${label}</span>` : ""}</li>`;
+        }).join("")}</ul>
+      </details>`;
+
+    const setup = $("#tzSetup", body);
+    if (setup) setup.onsubmit = (e) => {
+      e.preventDefault();
+      const token = $("#tzToken", body).value.trim(), contact = $("#tzContact", body).value.trim();
+      if (!token) return;
+      state.tz = { token, contact };
+      tzOnline = { at: 0, data: null, error: "", loading: false };
+      save(); render();
+    };
+    const rf = $("#tzRefresh", body);
+    if (rf) rf.onclick = () => fetchOnlineTZ(true);
+    const fg = $("#tzForget", body);
+    if (fg) fg.onclick = () => { if (!confirm("Remove your D2RuneWizard token from this account?")) return; delete state.tz; tzOnline = { at: 0, data: null, error: "", loading: false }; save(); render(); };
+
+    fetchOnlineTZ(false);
+    // Tick the countdowns; re-render at a switch, and re-check the online report every 2 minutes.
+    const renderedSlot = sp[0].start;
+    let ticks = 0;
+    tzTimer = setInterval(() => {
+      if (tab !== "tz" || !document.body.contains(body)) { clearInterval(tzTimer); tzTimer = null; return; }
+      const t = Date.now();
+      if (TZ.spWindows(t, 1)[0].start !== renderedSlot) { tzOnline.at = 0; render(); return; }
+      body.querySelectorAll("[data-until]").forEach((el) => { el.textContent = countdown(Number(el.dataset.until) - t); });
+      if (++ticks % 120 === 0) fetchOnlineTZ(false);
+    }, 1000);
   }
 
   // ---------- add gear from photos (on-device OCR) ----------
