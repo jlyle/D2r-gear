@@ -151,15 +151,35 @@
   const qtyOf = (e) => Math.max(1, Number(e.qty) || 1);
   const stackable = (name) => STACKABLE.includes(byName.get(name)?.slot);
   const stashCount = () => state.stash.reduce((n, e) => n + qtyOf(e), 0);
-  // Add to the stash; a stackable item you already hold (same notes) just goes up by one.
-  function addToStash(item, note = "") {
+  // Add to the stash; a stackable item you already hold (same notes) just goes up by the amount added.
+  function addToStash(item, note = "", n = 1) {
+    n = Math.max(1, Math.floor(Number(n)) || 1);
     if (stackable(item)) {
       const same = state.stash.find((e) => e.item === item && (e.note || "") === (note || ""));
-      if (same) { same.qty = qtyOf(same) + 1; same.added = Date.now(); return same.id; }
+      if (same) { same.qty = qtyOf(same) + n; same.added = Date.now(); return same.id; }
     }
     const id = uid();
-    state.stash.push({ id, added: Date.now(), item, note: note || "" });
+    const entry = { id, added: Date.now(), item, note: note || "" };
+    if (n > 1) entry.qty = n;
+    state.stash.push(entry);
     return id;
+  }
+  const QTY_MAX = 9999;
+  // A typed quantity box: tap it to type a total; + / - keys (and the arrow keys) step it by one.
+  // onCommit(n, how): how is "step" (a +/- key), "enter", or "change" (edited, then left the box).
+  function wireQtyInput(input, onCommit, min = 1) {
+    const clamp = (v) => Math.min(QTY_MAX, Math.max(min, Math.floor(Number(v)) || 0));
+    const step = (d) => { input.value = clamp((Number(input.value) || 0) + d); };
+    input.addEventListener("focus", () => input.select());
+    input.addEventListener("click", () => input.select());
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "+" || ev.key === "=" || ev.key === "ArrowUp") { ev.preventDefault(); step(1); if (onCommit) onCommit(clamp(input.value), "step"); }
+      else if (ev.key === "-" || ev.key === "_" || ev.key === "ArrowDown") { ev.preventDefault(); step(-1); if (onCommit) onCommit(clamp(input.value), "step"); }
+      else if (ev.key === "Enter") { ev.preventDefault(); input.value = clamp(input.value); if (onCommit) onCommit(clamp(input.value), "enter"); else input.blur(); }
+    });
+    input.addEventListener("input", () => { input.value = input.value.replace(/\D/g, "").slice(0, 4); });
+    input.addEventListener("change", () => { input.value = clamp(input.value); if (onCommit) onCommit(clamp(input.value), "change"); });
+    return { step, value: () => clamp(input.value) };
   }
   // Older stashes may hold the same rune several times: fold those into one entry with a count.
   function mergeStacks() {
@@ -954,7 +974,7 @@
             ${entryHTML(e, it, { noteKey: e.id })}
           </div>
           <div class="row-btns">
-            ${stackable(e.item) || qtyOf(e) > 1 ? `<div class="qty" aria-label="Quantity"><button class="btn ghost small qminus" aria-label="One fewer">−</button><span class="qn">${qtyOf(e)}</span><button class="btn ghost small qplus" aria-label="One more">+</button></div>` : ""}
+            ${stackable(e.item) || qtyOf(e) > 1 ? `<div class="qty" aria-label="Quantity"><button class="btn ghost small qminus" aria-label="One fewer">−</button><input class="qn" type="text" inputmode="numeric" pattern="[0-9]*" value="${qtyOf(e)}" aria-label="Quantity — tap to type a total"><button class="btn ghost small qplus" aria-label="One more">+</button></div>` : ""}
             ${canEquip ? `<button class="btn small eq" data-slot="${target || ""}">Equip</button>` : ""}
             <button class="btn ghost small rm" aria-label="Remove">✕</button>
           </div>
@@ -970,6 +990,7 @@
             ${searchHTML("Search any item…")}
             <label class="field"><span>Gear type</span><select id="addStashType">${STASH_TYPES.map(([g, l]) => `<option value="${g}" ${g === stashType ? "selected" : ""}>${l}</option>`).join("")}</select></label>
             <label class="field"><span>Item</span><select id="addStash">${itemsOfType(c, stashType)}</select></label>
+            <div class="field"><span>Qty</span><div class="qty add-qty"><button type="button" class="btn ghost small" id="addQtyMinus" aria-label="One fewer">−</button><input class="qn" id="addQty" type="text" inputmode="numeric" pattern="[0-9]*" value="1" aria-label="Quantity to add — tap to type a number"><button type="button" class="btn ghost small" id="addQtyPlus" aria-label="One more">+</button></div></div>
           </div>
           <button class="btn" id="addStashBtn">Add</button>
         </div>
@@ -1013,7 +1034,10 @@
       $("#addStash").value = it.name;
       $("#addStashBtn").focus();
     });
-    $("#addStashBtn").onclick = () => { flashId = addToStash($("#addStash").value); save(); render(); };
+    const addQty = wireQtyInput($("#addQty"), (n, how) => { if (how === "enter") $("#addStashBtn").click(); });
+    $("#addQtyMinus").onclick = () => addQty.step(-1);
+    $("#addQtyPlus").onclick = () => addQty.step(1);
+    $("#addStashBtn").onclick = () => { flashId = addToStash($("#addStash").value, "", addQty.value()); save(); render(); };
     $("#cuAdd").onclick = () => {
       let name = $("#cuName").value.trim().replace(/\s+/g, " ");
       if (!name) { $("#cuErr").textContent = "Give the item a name."; return; }
@@ -1032,6 +1056,14 @@
       $(".rm", row).onclick = () => { state.stash = state.stash.filter((x) => x !== e); pruneCustom(); save(); render(); };
       const qm = $(".qminus", row), qp = $(".qplus", row);
       if (qp) qp.onclick = () => { e.qty = qtyOf(e) + 1; save(); render(); };
+      const qn = $("input.qn", row);
+      if (qn) wireQtyInput(qn, (n, how) => {
+        const done = how !== "step";
+        if (n <= 0) { if (done) { state.stash = state.stash.filter((x) => x !== e); pruneCustom(); save(); render(); } return; }
+        e.qty = n; save();
+        if (done) render();
+        else { const t = document.querySelector('.tab[data-tab="stash"]'); if (t) t.textContent = `Stash (${stashCount()})`; }
+      }, 0);
       if (qm) qm.onclick = () => {
         if (qtyOf(e) > 1) e.qty = qtyOf(e) - 1;
         else { state.stash = state.stash.filter((x) => x !== e); pruneCustom(); }

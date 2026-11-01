@@ -299,6 +299,10 @@ dialog h2 { font-size: 18px; }
 .qty { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 8px; padding: 1px; }
 .qty .btn { min-width: 34px; padding: 4px 0; border: 0; font-size: 18px; line-height: 1; }
 .qty .qn { min-width: 26px; text-align: center; font-weight: 700; }
+input.qn { width: 46px; min-width: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: inherit; font: inherit; font-weight: 700; text-align: center; padding: 4px 2px; cursor: text; }
+input.qn:hover { border-color: var(--line); }
+input.qn:focus { outline: none; border-color: var(--accent); background: rgba(127,127,127,.12); }
+.add-qty { align-self: flex-start; }
 
 /* Gems & Cube tab */
 .cube-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 0; border-top: 1px solid var(--line); }
