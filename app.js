@@ -1669,9 +1669,20 @@
     await saveChain;
     const { name, salt, iv, data } = session.acct;
     const blob = new Blob([JSON.stringify({ format: "gear-ledger-account", v: 2, name, salt, iv, data })], { type: "application/json" });
+    const fileName = `perfect-roll-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
+    // Browsers that can show a "Save as" window (Chrome/Edge on a computer) let you pick the folder.
+    if (window.showSaveFilePicker) {
+      try {
+        const fh = await window.showSaveFilePicker({ suggestedName: fileName, types: [{ description: "Perfect Roll backup", accept: { "application/json": [".json"] } }] });
+        const w = await fh.createWritable(); await w.write(blob); await w.close();
+        return;
+      } catch (err) {
+        if (err && err.name === "AbortError") return; // closed the window without saving
+      }
+    }
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `perfect-roll-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = fileName;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   };
