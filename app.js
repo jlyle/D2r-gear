@@ -156,7 +156,7 @@
   function addToStash(item, note = "", n = 1) {
     n = Math.max(1, Math.floor(Number(n)) || 1);
     if (stackable(item)) {
-      const same = state.stash.find((e) => e.item === item && (e.note || "") === (note || ""));
+      const same = state.stash.find((e) => e.item === item && (e.note || "") === (note || "") && !(e.loc || "").trim());
       if (same) { same.qty = qtyOf(same) + n; same.added = Date.now(); return same.id; }
     }
     const id = uid();
@@ -165,6 +165,9 @@
     state.stash.push(entry);
     return id;
   }
+  // Where a stash item is kept (shared stash, a mule's name…), typed by the player.
+  const locOf = (e) => (e?.loc || "").trim();
+  const knownLocs = () => [...new Set(state.stash.map(locOf).filter(Boolean))].sort((a, z) => a.localeCompare(z));
   const QTY_MAX = 9999;
   // A typed quantity box: tap it to type a total; + / - keys (and the arrow keys) step it by one.
   // onCommit(n, how): how is "step" (a +/- key), "enter", or "change" (edited, then left the box).
@@ -187,7 +190,7 @@
     const seen = new Map(); let changed = false;
     state.stash = state.stash.filter((e) => {
       if (!stackable(e.item)) return true;
-      const k = e.item + "|" + (e.note || "");
+      const k = e.item + "|" + (e.note || "") + "|" + (e.loc || "").trim().toLowerCase();
       const first = seen.get(k);
       if (!first) { seen.set(k, e); return true; }
       first.qty = qtyOf(first) + qtyOf(e); first.added = Math.max(first.added || 0, e.added || 0); changed = true;
@@ -980,10 +983,12 @@
         const target = u ? u.slotKey : slotsFor(c, it)[0]?.key;
         const canEquip = it.slot === "charm" || target;
         const hay = [e.item, it.alias, it.runes, it.base, e.note, SLOT_LABELS[g]].filter(Boolean).join(" ").toLowerCase();
-        return `<div class="charm-row ${e.id === flashId ? "flash" : ""}" data-id="${e.id}" data-find="${esc(hay)}">
+        const loc = locOf(e);
+        return `<div class="charm-row ${e.id === flashId ? "flash" : ""}" data-id="${e.id}" data-hay="${esc(hay)}" data-find="${esc((hay + " " + loc).toLowerCase())}">
           <div>
             ${u ? `<div class="ok up-flag">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
             ${entryHTML(e, it, { noteKey: e.id })}
+            <label class="loc-field"><span>📍 Location</span><input type="text" class="loc-in" list="stashLocs" value="${esc(loc)}" placeholder="Shared stash, mule name…" maxlength="60" autocomplete="off" enterkeyhint="done"></label>
           </div>
           <div class="row-btns">
             ${stackable(e.item) || qtyOf(e) > 1 ? `<div class="qty" aria-label="Quantity"><button class="btn ghost small qminus" aria-label="One fewer">−</button><input class="qn" type="text" inputmode="numeric" pattern="[0-9]*" value="${qtyOf(e)}" aria-label="Quantity — tap to type a total"><button class="btn ghost small qplus" aria-label="One more">+</button></div>` : ""}
@@ -996,7 +1001,7 @@
     body.innerHTML = `
       <div class="card">
         <h3>Shared stash</h3>
-        <p class="notes" style="margin-top:4px">Items here are shared by all your characters. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash.</p>
+        <p class="notes" style="margin-top:4px">Items here are shared by all your characters. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash. Type where each item is kept (a mule's name, say) in its Location box; Find searches locations too.</p>
         <div class="add-row">
           <div class="stack add-pick">
             ${searchHTML("Search any item…")}
@@ -1022,7 +1027,8 @@
         ${state.stash.length ? `<label class="field stash-find"><span>Find in your stash (${stashCount()} item${stashCount() === 1 ? "" : "s"})</span>
           <input type="search" id="stashFind" placeholder="Name, rune, base or stat…" value="${esc(stashFind)}" autocomplete="off"></label>
           <p class="notes" id="stashNone" hidden>Nothing in your stash matches.</p>` : ""}
-        ${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
+        ${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}
+        <datalist id="stashLocs">${knownLocs().map((l) => `<option value="${esc(l)}">`).join("")}</datalist></div>`;
     const applyFind = () => {
       const q = stashFind.trim().toLowerCase().split(/\s+/).filter(Boolean);
       let shown = 0;
@@ -1083,6 +1089,17 @@
       };
       const eq = $(".eq", row);
       if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
+      const li = $(".loc-in", row);
+      if (li) {
+        li.oninput = () => {
+          const v = li.value.slice(0, 60);
+          if (v.trim()) e.loc = v; else delete e.loc;
+          row.dataset.find = (row.dataset.hay + " " + v.trim()).toLowerCase();
+          save();
+        };
+        li.onkeydown = (ev) => { if (ev.key === "Enter") li.blur(); };
+        li.onchange = () => { if (e.loc) e.loc = e.loc.trim(); if (mergeStacks()) { save(); render(); } else save(); };
+      }
     });
     wireEntries(body, (k) => state.stash.find((x) => x.id === k));
     showFlash(body);
@@ -1177,7 +1194,7 @@
         const su = stashUpgrades(c);
         if (!su.length) return "";
         return `<div class="card up stash-card"><h3>From your stash</h3><div class="now">Already yours — free upgrades for ${esc(c.name)}</div>
-          <ul class="sugg">${su.map((u) => `<li data-id="${u.entry.id}" data-slot="${u.slotKey || ""}"><div>${itemLine(u.it)}<div class="s-stats">${esc(u.label)} · ${esc(u.why)}</div></div><button class="btn small eq">Equip</button></li>`).join("")}</ul></div>`;
+          <ul class="sugg">${su.map((u) => `<li data-id="${u.entry.id}" data-slot="${u.slotKey || ""}"><div>${itemLine(u.it)}<div class="s-stats">${esc(u.label)} · ${esc(u.why)}</div>${locOf(u.entry) ? `<div class="s-stats loc-tag">📍 ${esc(locOf(u.entry))}</div>` : ""}</div><button class="btn small eq">Equip</button></li>`).join("")}</ul></div>`;
       })()}
       <div class="card notes" style="margin-bottom:12px">${esc(b.notes)}</div>
       ${todo.length ? todo.map(({ s, r }) => {

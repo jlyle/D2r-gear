@@ -13,6 +13,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 - Mercenary weapon, helm and armor
 - Charm inventory with 10×4 cell usage and duplicate-unique warnings
 - Shared stash (all characters): any item — gear, runes, gems, jewels, keys, organs, essences, tokens, or your own custom items; flags stash items that upgrade the current character, one-tap Equip that swaps the worn item back to stash
+- Location box on every stash item: type where it's kept (shared stash tab, a mule's name…). Locations you've used before are offered as suggestions, Find searches them, and the Upgrades tab shows where a stash upgrade is so you know which mule to log in.
 - Top 5 builds for every class, including the Warlock (Season 15 / Patch 3.3, Reign of the Warlock), with Starter/Mid/Endgame gear per slot
 - Add gear from photos: snap item tooltips, on-device OCR (Tesseract.js) matches the item, pre-picks the slot and fills in your rolls
 - Photos are only used to read stats and are never stored; items show original gear-type icons tinted by rarity
@@ -42,7 +43,7 @@ Good to know:
 ## Runes
 Runes live in the shared stash like any other item, so every character on the account sees the same pile.
 
-**Adding runes:** on the Stash tab, choose Gear type **Rune** and pick from El through Zod. Runes stack: adding one you already have bumps its count instead of making a new row, and the − / + buttons on the row change the count directly.
+**Adding runes:** on the Stash tab, choose Gear type **Rune** and pick from El through Zod. Runes stack: adding one you already have bumps its count instead of making a new row (new ones join the stack with no location set; give a stack on a mule its own Location and it stays a separate row), and the − / + buttons on the row change the count directly.
 
 **Runewords tab** — built from the runes in your stash:
 - **Runes in your stash** — every rune you hold, in game order, with counts.
