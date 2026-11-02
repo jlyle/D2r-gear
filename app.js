@@ -464,7 +464,7 @@
   function addImportedAccount(rec) {
     // Same name already on this device: offer to replace it with the backup instead of adding a copy.
     const same = accounts.find((a) => a.name.toLowerCase() === String(rec.name || "").toLowerCase());
-    if (same && !(session && session.acct.id === same.id) &&
+    if (same &&
         confirm(`An account named "${same.name}" is already on this device.\n\nOK = replace it with this backup\nCancel = keep both`)) {
       Object.assign(same, { salt: rec.salt, iv: rec.iv, data: rec.data });
       writeAccounts();
@@ -486,6 +486,7 @@
     let data;
     try { data = JSON.parse(await f.text()); } catch (err) { alert("That file isn't a Perfect Roll backup."); return; }
     if (data.format === "gear-ledger-account" && data.salt && data.iv && data.data) {
+      await saveChain; // finish any save into the open account before it might be replaced
       const before = accounts.length;
       const acct = addImportedAccount(data);
       alert(`${accounts.length > before ? "Added" : "Replaced"} account "${acct.name}". Unlock it with its password.`);
