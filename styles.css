@@ -231,6 +231,12 @@ dialog h2 { font-size: 18px; }
 .loc-field > span { font-size: 12px; color: var(--muted); white-space: nowrap; }
 .loc-field input { flex: 1; min-width: 0; font-size: 16px; padding: 6px 8px; }
 .loc-tag { color: var(--charm); }
+.loc-wrap { position: relative; }
+.loc-sugg { position: absolute; z-index: 20; left: 0; right: 0; top: 100%; margin-top: 2px; display: flex; flex-direction: column; background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; box-shadow: 0 6px 18px rgba(0,0,0,.35); overflow: hidden; }
+.loc-sugg[hidden] { display: none; }
+.loc-opt { text-align: left; padding: 10px 12px; font: inherit; font-size: 15px; color: inherit; background: transparent; border: 0; border-top: 1px solid var(--line); cursor: pointer; }
+.loc-opt:first-child { border-top: 0; }
+.loc-opt:hover, .loc-opt:focus { background: rgba(127,127,127,.15); }
 .charm-row .row-btns { flex-direction: column; align-items: flex-end; }
 .photo-view { width: min(96vw, 900px); padding: 12px; }
 .photo-view img { width: 100%; max-height: 80vh; object-fit: contain; background: #000; border-radius: 6px; display: block; }

@@ -76,6 +76,7 @@
     if (!Array.isArray(d.custom)) d.custom = []; // user-defined items not in the database
     if (!Array.isArray(d.chars)) d.chars = [];
     if (!Array.isArray(d.stash)) d.stash = [];
+    if (!Array.isArray(d.locRecent)) d.locRecent = []; // stash locations, most recently used first
     if (!d.current && d.chars.length) d.current = d.chars[0].id;
     return d;
   }
@@ -168,6 +169,29 @@
   // Where a stash item is kept (shared stash, a mule's name…), typed by the player.
   const locOf = (e) => (e?.loc || "").trim();
   const knownLocs = () => [...new Set(state.stash.map(locOf).filter(Boolean))].sort((a, z) => a.localeCompare(z));
+  const LOC_SHOW = 5;
+  // Remember a location as the most recently used one.
+  function rememberLoc(v) {
+    v = (v || "").trim();
+    if (!v) return;
+    const k = v.toLowerCase();
+    state.locRecent = [v, ...(state.locRecent || []).filter((x) => x.toLowerCase() !== k)].slice(0, 40);
+  }
+  // Up to 5 locations for the dropdown: most recently used first, then any others in the stash,
+  // matching what's typed (anywhere in the name), leaving out exactly what's already in the box.
+  function locChoices(typed, current = typed) {
+    const q = (typed || "").trim().toLowerCase();
+    const cur = (current || "").trim().toLowerCase();
+    const seen = new Set(); const out = [];
+    for (const l of [...(state.locRecent || []), ...knownLocs()]) {
+      const k = l.toLowerCase();
+      if (seen.has(k)) continue; seen.add(k);
+      if (k === cur || (q && !k.includes(q))) continue;
+      out.push(l);
+      if (out.length === LOC_SHOW) break;
+    }
+    return out;
+  }
   const QTY_MAX = 9999;
   // A typed quantity box: tap it to type a total; + / - keys (and the arrow keys) step it by one.
   // onCommit(n, how): how is "step" (a +/- key), "enter", or "change" (edited, then left the box).
@@ -988,7 +1012,7 @@
           <div>
             ${u ? `<div class="ok up-flag">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
             ${entryHTML(e, it, { noteKey: e.id })}
-            <label class="loc-field"><span>📍 Location</span><input type="text" class="loc-in" list="stashLocs" value="${esc(loc)}" placeholder="Shared stash, mule name…" maxlength="60" autocomplete="off" enterkeyhint="done"></label>
+            <div class="loc-wrap"><label class="loc-field"><span>📍 Location</span><input type="text" class="loc-in" value="${esc(loc)}" placeholder="Shared stash, mule name…" maxlength="60" autocomplete="off" enterkeyhint="done"></label><div class="loc-sugg" role="listbox" aria-label="Recent locations" hidden></div></div>
           </div>
           <div class="row-btns">
             ${stackable(e.item) || qtyOf(e) > 1 ? `<div class="qty" aria-label="Quantity"><button class="btn ghost small qminus" aria-label="One fewer">−</button><input class="qn" type="text" inputmode="numeric" pattern="[0-9]*" value="${qtyOf(e)}" aria-label="Quantity — tap to type a total"><button class="btn ghost small qplus" aria-label="One more">+</button></div>` : ""}
@@ -1027,8 +1051,7 @@
         ${state.stash.length ? `<label class="field stash-find"><span>Find in your stash (${stashCount()} item${stashCount() === 1 ? "" : "s"})</span>
           <input type="search" id="stashFind" placeholder="Name, rune, base or stat…" value="${esc(stashFind)}" autocomplete="off"></label>
           <p class="notes" id="stashNone" hidden>Nothing in your stash matches.</p>` : ""}
-        ${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}
-        <datalist id="stashLocs">${knownLocs().map((l) => `<option value="${esc(l)}">`).join("")}</datalist></div>`;
+        ${sections || `<p class="notes">Stash is empty. Add the items you're holding onto.</p>`}</div>`;
     const applyFind = () => {
       const q = stashFind.trim().toLowerCase().split(/\s+/).filter(Boolean);
       let shown = 0;
@@ -1091,14 +1114,31 @@
       if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
       const li = $(".loc-in", row);
       if (li) {
-        li.oninput = () => {
-          const v = li.value.slice(0, 60);
+        const box = $(".loc-sugg", row);
+        const setLoc = (v) => {
+          v = v.slice(0, 60);
           if (v.trim()) e.loc = v; else delete e.loc;
           row.dataset.find = (row.dataset.hay + " " + v.trim()).toLowerCase();
-          save();
         };
-        li.onkeydown = (ev) => { if (ev.key === "Enter") li.blur(); };
-        li.onchange = () => { if (e.loc) e.loc = e.loc.trim(); if (mergeStacks()) { save(); render(); } else save(); };
+        const commit = () => {
+          if (e.loc) { e.loc = e.loc.trim(); rememberLoc(e.loc); }
+          if (mergeStacks()) { save(); render(); } else save();
+        };
+        // On tap: the 5 most recent (other than what's in the box). While typing: the 5 most recent that match.
+        const showSugg = (typing) => {
+          const list = locChoices(typing ? li.value : "", li.value);
+          box.innerHTML = list.map((l) => `<button type="button" class="loc-opt" role="option">${esc(l)}</button>`).join("");
+          box.hidden = !list.length;
+          box.querySelectorAll(".loc-opt").forEach((b, i) => {
+            // pointerdown, so the pick lands before the box loses focus
+            b.onpointerdown = (ev) => { ev.preventDefault(); li.value = list[i]; setLoc(list[i]); box.hidden = true; commit(); li.blur(); };
+          });
+        };
+        li.onfocus = () => showSugg(false);
+        li.oninput = () => { setLoc(li.value); save(); showSugg(true); };
+        li.onkeydown = (ev) => { if (ev.key === "Enter") li.blur(); if (ev.key === "Escape") box.hidden = true; };
+        li.onblur = () => setTimeout(() => { box.hidden = true; }, 150);
+        li.onchange = commit;
       }
     });
     wireEntries(body, (k) => state.stash.find((x) => x.id === k));

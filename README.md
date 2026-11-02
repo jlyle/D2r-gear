@@ -13,7 +13,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 - Mercenary weapon, helm and armor
 - Charm inventory with 10×4 cell usage and duplicate-unique warnings
 - Shared stash (all characters): any item — gear, runes, gems, jewels, keys, organs, essences, tokens, or your own custom items; flags stash items that upgrade the current character, one-tap Equip that swaps the worn item back to stash
-- Location box on every stash item: type where it's kept (shared stash tab, a mule's name…). Locations you've used before are offered as suggestions, Find searches them, and the Upgrades tab shows where a stash upgrade is so you know which mule to log in.
+- Location box on every stash item: type where it's kept (shared stash tab, a mule's name…). Tapping the box lists your 5 most recently used locations, and typing narrows them to the 5 most recent that match ("stash" shows Shared stash 4, 3, 2, 1), Find searches them, and the Upgrades tab shows where a stash upgrade is so you know which mule to log in.
 - Top 5 builds for every class, including the Warlock (Season 15 / Patch 3.3, Reign of the Warlock), with Starter/Mid/Endgame gear per slot
 - Add gear from photos: snap item tooltips, on-device OCR (Tesseract.js) matches the item, pre-picks the slot and fills in your rolls
 - Photos are only used to read stats and are never stored; items show original gear-type icons tinted by rarity
