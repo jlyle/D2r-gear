@@ -411,7 +411,7 @@
         <section class="card">
           <h2>Restore</h2>
           <p class="notes">Import an account backup exported from another device. You'll unlock it with its original password.</p>
-          <label class="btn ghost file-btn">Import account backup<input type="file" id="loginImport" accept="application/json,.json"></label>
+          <label class="btn ghost file-btn">Import account backup<input type="file" id="loginImport"></label>
         </section>
       </div>`;
 
