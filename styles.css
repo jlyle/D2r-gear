@@ -220,6 +220,7 @@ dialog h2 { font-size: 18px; }
 .tip-actions { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; }
 .link { background: none; border: 0; padding: 4px 0; color: var(--accent); font-size: 13px; cursor: pointer; }
 .link:hover { text-decoration: underline; }
+.link.danger { color: var(--bad); }
 .tip .note { margin-top: 8px; font-size: 14px; }
 .ph { flex: none; width: 72px; height: 72px; padding: 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: #000; cursor: zoom-in; }
 .ph img { width: 100%; height: 100%; object-fit: cover; display: block; }

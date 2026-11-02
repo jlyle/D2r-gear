@@ -394,6 +394,7 @@
             <label class="field"><span>Password for ${esc(picked.name)}</span><input type="password" id="unlockPw" autocomplete="current-password" required></label>
             <button class="btn" type="submit">Unlock</button>
             <p class="err" id="unlockErr"></p>
+            <button type="button" class="link danger" id="loginDelete">Delete ${esc(picked.name)} from this device</button>
           </form>` : `<p class="notes">Pick an account to unlock it.</p>`}
         </section>` : ""}
         <section class="card">
@@ -418,6 +419,18 @@
     loadReadme();
     $("#readmeBox").ontoggle = (e) => { readmeOpen = e.target.open; };
     app.querySelectorAll(".acct").forEach((b) => (b.onclick = () => { pickedAcct = b.dataset.id; renderLogin(); $("#unlockPw")?.focus(); }));
+    const ld = $("#loginDelete");
+    if (ld) ld.onclick = () => {
+      const a = accounts.find((x) => x.id === pickedAcct);
+      if (!a) return;
+      const typed = prompt(`This permanently deletes the account "${a.name}", its characters and its stash from this device. A backup file you saved isn't affected.\n\nType the account name to confirm:`);
+      if (typed === null) return;
+      if (typed.trim().toLowerCase() !== a.name.trim().toLowerCase()) { alert(`"${typed.trim()}" doesn't match "${a.name}", so nothing was deleted.`); return; }
+      accounts = accounts.filter((x) => x.id !== a.id);
+      writeAccounts();
+      pickedAcct = null;
+      renderLogin();
+    };
     const uf = $("#unlockForm");
     if (uf) uf.onsubmit = async (e) => {
       e.preventDefault();
@@ -449,6 +462,14 @@
   }
 
   function addImportedAccount(rec) {
+    // Same name already on this device: offer to replace it with the backup instead of adding a copy.
+    const same = accounts.find((a) => a.name.toLowerCase() === String(rec.name || "").toLowerCase());
+    if (same && !(session && session.acct.id === same.id) &&
+        confirm(`An account named "${same.name}" is already on this device.\n\nOK = replace it with this backup\nCancel = keep both`)) {
+      Object.assign(same, { salt: rec.salt, iv: rec.iv, data: rec.data });
+      writeAccounts();
+      return same;
+    }
     let name = rec.name || "Imported", n = 2;
     while (accounts.some((a) => a.name.toLowerCase() === name.toLowerCase())) name = `${rec.name} (${n++})`;
     const acct = { id: uid(), name, salt: rec.salt, iv: rec.iv, data: rec.data, created: Date.now() };
@@ -465,8 +486,9 @@
     let data;
     try { data = JSON.parse(await f.text()); } catch (err) { alert("That file isn't a Perfect Roll backup."); return; }
     if (data.format === "gear-ledger-account" && data.salt && data.iv && data.data) {
+      const before = accounts.length;
       const acct = addImportedAccount(data);
-      alert(`Added account "${acct.name}". Unlock it with its password.`);
+      alert(`${accounts.length > before ? "Added" : "Replaced"} account "${acct.name}". Unlock it with its password.`);
       if (session) lock(); else { pickedAcct = acct.id; render(); }
       return;
     }
