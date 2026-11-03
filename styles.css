@@ -378,3 +378,14 @@ input.qn:focus { outline: none; border-color: var(--accent); background: rgba(12
 .stat-big .frames { font: 500 13px Inter, sans-serif; color: var(--muted); margin-left: 6px; }
 .bps span small { opacity: .7; margin-left: 2px; }
 .ias-ctl { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
+
+/* Bases in the stash */
+.base-opts { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.base-opts .field { min-width: 120px; }
+.eth-check, .base-ctl .check { display: inline-flex; gap: 6px; align-items: center; padding-bottom: 8px; }
+.base-ctl { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; margin-top: 8px; }
+.base-ctl .field { min-width: 110px; }
+.base-fits { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 8px; }
+.base-fits small { opacity: .75; }
+.rw-base { margin-top: 2px; }
+.rw-base.ok { color: var(--good); }

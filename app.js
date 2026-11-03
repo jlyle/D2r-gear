@@ -5,7 +5,29 @@
   const INV_CELLS = 40; // 10 x 4 inventory
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  // Socketable base items (white/grey runeword bases) for the stash's Bases section.
+  const TIER_WORD = { n: "Normal", x: "Exceptional", e: "Elite" };
+  const BASE_KIND = { "Body armor": "body armor", Helms: "helm", Shields: "shield", Weapons: "weapon" };
+  for (const [name, b] of Object.entries(ITEM_BASES)) {
+    const st = [`${TIER_WORD[b.tier]} ${BASE_KIND[b.cat]}`, `Up to ${b.sock} socket${b.sock > 1 ? "s" : ""}`];
+    if (b.def) st.push(`Defense up to ${b.def}`);
+    if (b.dmg) st.push(`Damage ${b.dmg}`);
+    if (b.wsm !== undefined) st.push(`Speed ${b.wsm > 0 ? "+" : ""}${b.wsm}`);
+    if (b.str) st.push(`Req strength ${b.str}`);
+    if (b.dex) st.push(`Req dexterity ${b.dex}`);
+    ITEMS.push({ name, type: "base", slot: "base", base: name, btype: b.type, req: b.lvl, stats: st.join(", ") });
+  }
   const byName = new Map(ITEMS.map((i) => [i.name, i]));
+  // Which runewords a base with a given socket count can take (game item-type rules).
+  const rwKey = (n) => String(n).toLowerCase().replace(/\s*\((sword|shield|helm|weapon|armor)\)$/, "").replace(/[^a-z0-9]/g, "");
+  const RW_FIT = new Map();
+  for (const [n, r] of Object.entries(RW_TYPES)) { const k = rwKey(n); RW_FIT.set(k, [...(RW_FIT.get(k) || []), r]); }
+  const typeFamily = (code) => { const seen = new Set(); const q = [code]; while (q.length) { const c = q.shift(); if (!c || seen.has(c)) continue; seen.add(c); q.push(...(TYPE_PARENTS[c] || [])); } return seen; };
+  function baseFitsRw(baseName, sockets, rwName) {
+    const b = ITEM_BASES[baseName]; if (!b) return false;
+    const fam = typeFamily(b.type);
+    return (RW_FIT.get(rwKey(rwName)) || []).some((r) => r.n === Number(sockets) && r.it.some((t) => fam.has(t)) && !r.ex.some((t) => fam.has(t)));
+  }
   const DUAL_WIELD = ["Barbarian", "Assassin"]; // classes that can hold a weapon in the off-hand
   const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -146,7 +168,7 @@
     try { const raw = localStorage.getItem(STORE_KEY); return raw ? normalize(JSON.parse(raw)) : null; } catch (e) { return null; }
   }
 
-  const SLOT_LABELS = { helm: "Helms", amulet: "Amulets", ring: "Rings", weapon: "Weapons", offhand: "Shields & off-hands", armor: "Armor", gloves: "Gloves", belt: "Belts", boots: "Boots", charm: "Charms", rune: "Runes", gem: "Gems", jewel: "Jewels & facets", misc: "Keys, organs & other" };
+  const SLOT_LABELS = { helm: "Helms", amulet: "Amulets", ring: "Rings", weapon: "Weapons", offhand: "Shields & off-hands", armor: "Armor", gloves: "Gloves", belt: "Belts", boots: "Boots", charm: "Charms", rune: "Runes", gem: "Gems", jewel: "Jewels & facets", misc: "Keys, organs & other", base: "Bases" };
   const inStash = (name) => state.stash.some((s) => s.item === name);
   // Runes, gems, keys, essences etc. stack: one stash entry with a count.
   const STACKABLE = ["rune", "gem", "misc"];
@@ -1021,6 +1043,7 @@
           <div class="rw-head"><span class="n-runeword rw-name">${esc(target.name)}</span>${status}${inBuild.has(target.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}</div>
           <div class="rw-runes">${chips}</div>
           <div class="notes">${esc([...target.bases].join(" · ") || "")}${target.req ? ` · lvl ${target.req}` : ""}</div>
+          ${(() => { const bs = stashBasesFor(target.name); return `<p class="notes rw-base ${bs.length ? "ok" : ""}">${bs.length ? `Base in stash: ${bs.slice(0, 3).map((e) => `${esc(baseLabel(e))}${locOf(e) ? ` (📍 ${esc(locOf(e))})` : ""}`).join(", ")}` : `No ${target.runes.length}-socket base for it in your stash yet. Add one on the Stash tab under Base.`}</p>`; })()}
           <p class="notes rw-sum">In your stash: ${p.held} of ${target.runes.length}${p.cubed.length ? ` · Cube up: ${p.cubed.map(esc).join(", ")}` : ""}${p.toFind.length ? ` · Still to find: ${p.toFind.map(esc).join(", ")}` : ""}</p>
           ${p.steps.length ? `<h4 class="rw-sub">Cube steps, in order</h4>
             ${p.steps.map((r) => `<div class="cube-row"><div class="cube-recipe">${r.qty} × ${chip(r.from, true)}${r.gem ? ` + ${gemChip(r.gem, (stashCounts("gem")[r.gem] || 0) ? "have" : "need")}` : ""} <span class="arrow">→</span> <span class="rune-chip out">${esc(r.to)}</span></div><div class="cube-meta">${r.times > 1 ? `<span class="rw-qty">×${r.times}</span>` : ""}</div></div>`).join("")}` : ""}
@@ -1039,6 +1062,7 @@
         <div class="rw-head"><span class="n-runeword rw-name">${esc(g.name)}</span>${g.qty ? `<span class="rw-qty" title="How many you can make from your stash runes">×${g.qty} <small>can make</small></span>` : ""}${inBuild.has(g.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}<button class="btn small ghost rw-plan-btn" data-plan="${esc(g.name)}">Plan</button></div>
         <div class="rw-runes">${chips}</div>
         <div class="notes">${esc([...g.bases].join(" · ") || "")}${g.req ? ` · lvl ${g.req}` : ""}</div>
+        ${(() => { const bs = stashBasesFor(g.name); return bs.length ? `<div class="notes rw-base ok">Base in stash: ${bs.slice(0, 3).map((e) => `${esc(baseLabel(e))}${locOf(e) ? ` (📍 ${esc(locOf(e))})` : ""}`).join(", ")}${bs.length > 3 ? ` +${bs.length - 3} more` : ""}</div>` : `<div class="notes rw-base">No ${g.runes.length}-socket base for it in your stash</div>`; })()}
         ${g.missing.length ? `<div class="notes rw-miss">Need: ${g.missing.map(trLink).join(" ")}</div>` : ""}
         <details class="rw-stats"><summary>Stats</summary><ul class="tip-stats">${statLines(it.stats).map((l) => `<li>${esc(l)}</li>`).join("")}</ul></details>
       </div>`;
@@ -1194,6 +1218,28 @@
     body.querySelector("#rcQty").onchange = rcSet;
   }
 
+  // Bases in the stash that could hold a runeword (right type, right socket count).
+  const stashBasesFor = (rwName) => state.stash.filter((e) => byName.get(e.item)?.slot === "base" && baseFitsRw(e.item, e.sock || 0, rwName));
+  const baseLabel = (e) => `${e.eth ? "Eth " : ""}${e.item} ${e.sock || 0}os`;
+  function baseRowHTML(e) {
+    const b = ITEM_BASES[e.item]; if (!b) return "";
+    const sock = Math.min(Number(e.sock) || 0, b.sock);
+    let fits = "";
+    if (!sock) fits = `<p class="notes">No sockets yet. Larzuk (Act 5 quest or his socket service) or the Horadric Cube can add them; this base can hold up to ${b.sock}.</p>`;
+    else {
+      const st = new Map(runewordStatus(stashRunes()).map((g) => [rwKey(g.name), g]));
+      const list = [...new Set([...RW_FIT.keys()])].filter((k) => baseFitsRw(e.item, sock, k)).map((k) => st.get(k)).filter(Boolean)
+        .sort((x, y) => x.missing.length - y.missing.length || (y.req || 0) - (x.req || 0));
+      fits = list.length ? `<div class="base-fits"><span class="notes">Fits ${list.length} runeword${list.length === 1 ? "" : "s"}:</span> ${list.map((g) => `<span class="rune-chip ${g.missing.length ? "need" : "have"}" title="${esc(g.runes.join(" "))}${g.missing.length ? ` · need ${esc(g.missing.join(" "))}` : " · you have the runes"}">${esc(g.name)}${g.missing.length ? ` <small>−${g.missing.length}</small>` : " ✓"}</span>`).join(" ")}</div>
+          <p class="notes">✓ = you have the runes · −N = runes still needed</p>`
+        : `<p class="notes">No runeword takes a ${sock}-socket ${esc(BASE_KIND[b.cat])} of this type.</p>`;
+    }
+    return `<div class="base-ctl">
+        <label class="field"><span>Sockets</span><select class="base-sock">${Array.from({ length: b.sock + 1 }, (_, n) => `<option value="${n}" ${n === sock ? "selected" : ""}>${n === 0 ? "None yet" : n}</option>`).join("")}</select></label>
+        <label class="check"><input type="checkbox" class="base-eth" ${e.eth ? "checked" : ""}> Ethereal</label>
+      </div>${fits}`;
+  }
+
   function renderStash(body, c) {
     if (mergeStacks()) save();
     const groups = Object.keys(SLOT_LABELS);
@@ -1208,12 +1254,13 @@
         const u = ups.get(e.id);
         const target = u ? u.slotKey : slotsFor(c, it)[0]?.key;
         const canEquip = it.slot === "charm" || target;
-        const hay = [e.item, it.alias, it.runes, it.base, e.note, SLOT_LABELS[g]].filter(Boolean).join(" ").toLowerCase();
+        const hay = [e.item, it.alias, it.runes, it.base, e.note, SLOT_LABELS[g], it.slot === "base" ? `${e.sock || 0}os ${e.sock || 0} socket ${e.eth ? "eth ethereal" : ""}` : ""].filter(Boolean).join(" ").toLowerCase();
         const loc = locOf(e);
         return `<div class="charm-row ${e.id === flashId ? "flash" : ""}" data-id="${e.id}" data-hay="${esc(hay)}" data-find="${esc((hay + " " + loc).toLowerCase())}">
           <div>
             ${u ? `<div class="ok up-flag">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
             ${entryHTML(e, it, { noteKey: e.id })}
+            ${it.slot === "base" ? baseRowHTML(e) : ""}
             <div class="loc-wrap"><label class="loc-field"><span>📍 Location</span><input type="text" class="loc-in" value="${esc(loc)}" placeholder="Shared stash, mule name…" maxlength="60" autocomplete="off" enterkeyhint="done"></label><div class="loc-sugg" role="listbox" aria-label="Recent locations" hidden></div></div>
           </div>
           <div class="row-btns">
@@ -1233,6 +1280,10 @@
             ${searchHTML("Search any item…")}
             <label class="field"><span>Gear type</span><select id="addStashType">${STASH_TYPES.map(([g, l]) => `<option value="${g}" ${g === stashType ? "selected" : ""}>${l}</option>`).join("")}</select></label>
             <label class="field"><span>Item</span><select id="addStash">${itemsOfType(c, stashType)}</select></label>
+            <div class="base-opts" id="baseOpts" ${stashType === "base" ? "" : "hidden"}>
+              <label class="field"><span>Sockets</span><select id="addSock"></select></label>
+              <label class="check eth-check"><input type="checkbox" id="addEth"> Ethereal</label>
+            </div>
             <div class="field"><span>Qty</span><div class="qty add-qty"><button type="button" class="btn ghost small" id="addQtyMinus" aria-label="One fewer">−</button><input class="qn" id="addQty" type="text" inputmode="numeric" pattern="[0-9]*" value="1" aria-label="Quantity to add — tap to type a number"><button type="button" class="btn ghost small" id="addQtyPlus" aria-label="One more">+</button></div></div>
           </div>
           <button class="btn" id="addStashBtn">Add</button>
@@ -1269,18 +1320,36 @@
     };
     const findBox = $("#stashFind", body);
     if (findBox) { findBox.oninput = () => { stashFind = findBox.value; applyFind(); }; applyFind(); }
-    $("#addStashType").onchange = (ev) => { stashType = ev.target.value; $("#addStash").innerHTML = itemsOfType(c, stashType); };
+    const sockOpts = () => {
+      const b = ITEM_BASES[$("#addStash").value];
+      $("#baseOpts").hidden = stashType !== "base";
+      if (!b) return;
+      $("#addSock").innerHTML = Array.from({ length: b.sock + 1 }, (_, n) => `<option value="${n}" ${n === b.sock ? "selected" : ""}>${n === 0 ? "None yet" : n}</option>`).join("");
+    };
+    $("#addStashType").onchange = (ev) => { stashType = ev.target.value; $("#addStash").innerHTML = itemsOfType(c, stashType); sockOpts(); };
+    $("#addStash").addEventListener("change", sockOpts);
+    sockOpts();
     wireSearch($(".add-pick .isearch", body), null, (it) => {
       stashType = it.slot;
       $("#addStashType").value = stashType;
       $("#addStash").innerHTML = itemsOfType(c, stashType);
       $("#addStash").value = it.name;
+      sockOpts();
       $("#addStashBtn").focus();
     });
     const addQty = wireQtyInput($("#addQty"), (n, how) => { if (how === "enter") $("#addStashBtn").click(); });
     $("#addQtyMinus").onclick = () => addQty.step(-1);
     $("#addQtyPlus").onclick = () => addQty.step(1);
-    $("#addStashBtn").onclick = () => { flashId = addToStash($("#addStash").value, "", addQty.value()); save(); render(); };
+    $("#addStashBtn").onclick = () => {
+      if (stashType === "base") {
+        // Each base is its own row (sockets and ethereal differ), so add them one at a time.
+        for (let k = 0; k < addQty.value(); k++) {
+          const id = uid(); flashId = id;
+          state.stash.push({ id, added: Date.now(), item: $("#addStash").value, note: "", sock: Number($("#addSock").value) || 0, eth: $("#addEth").checked || undefined });
+        }
+      } else flashId = addToStash($("#addStash").value, "", addQty.value());
+      save(); render();
+    };
     $("#cuAdd").onclick = () => {
       let name = $("#cuName").value.trim().replace(/\s+/g, " ");
       if (!name) { $("#cuErr").textContent = "Give the item a name."; return; }
@@ -1314,6 +1383,10 @@
       };
       const eq = $(".eq", row);
       if (eq) eq.onclick = () => equipFromStash(c, e, eq.dataset.slot);
+      const bs = $(".base-sock", row);
+      if (bs) bs.onchange = () => { e.sock = Number(bs.value) || 0; save(); render(); };
+      const be = $(".base-eth", row);
+      if (be) be.onchange = () => { e.eth = be.checked || undefined; save(); render(); };
       const li = $(".loc-in", row);
       if (li) {
         const box = $(".loc-sugg", row);
@@ -1808,7 +1881,7 @@
   }
 
   const GEAR_TYPES = [["helm", "Helm"], ["armor", "Armor"], ["weapon", "Weapon"], ["offhand", "Shield / off-hand"], ["gloves", "Gloves"], ["belt", "Belt"], ["boots", "Boots"], ["amulet", "Amulet"], ["ring", "Ring"], ["charm", "Charm"]];
-  const STASH_TYPES = [...GEAR_TYPES, ["rune", "Rune"], ["gem", "Gem"], ["jewel", "Jewel / facet"], ["misc", "Key, organ, token & other"]];
+  const STASH_TYPES = [...GEAR_TYPES, ["base", "Base (for runewords)"], ["rune", "Rune"], ["gem", "Gem"], ["jewel", "Jewel / facet"], ["misc", "Key, organ, token & other"]];
   const TYPE_WORDS = [
     ["charm", /\b(small|large|grand) charm\b/], ["ring", /\bring\b/], ["amulet", /\bamulet\b/],
     ["helm", /\b(helm|cap|crown|mask|circlet|coronet|tiara|diadem|shako|pelt|hawk|antlers|totem|wolf head|spirit mask|demonhead|death mask|bone visage|sallet|casque|armet)\b/],
@@ -1827,6 +1900,14 @@
   }
   // Items of one gear type: this build's picks first, then by kind; other classes last.
   function itemsOfType(c, type) {
+    if (type === "base") {
+      let html = "";
+      for (const cat of ["Body armor", "Helms", "Shields", "Weapons"]) for (const t of ["e", "x", "n"]) {
+        const list = Object.entries(ITEM_BASES).filter(([, b]) => b.cat === cat && b.tier === t).sort((a, z) => a[0].localeCompare(z[0]));
+        if (list.length) html += `<optgroup label="${cat} — ${TIER_WORD[t]}">${list.map(([n, b]) => `<option value="${esc(n)}">${esc(n)} · up to ${b.sock} os${b.lvl ? ` · lvl ${b.lvl}` : ""}</option>`).join("")}</optgroup>`;
+      }
+      return html;
+    }
     const b = buildOf(c);
     const list = ITEMS.filter((i) => i.slot === type);
     const mine = list.filter((i) => !i.cls || i.cls === c.cls);
