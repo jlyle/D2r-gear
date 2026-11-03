@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perfect Roll — Tester Checklist</title>
+  <meta name="robots" content="noindex">
+  <style>
+    :root { --fg: #222; --bg: #fff; --muted: #666; --line: #e3ddd2; --accent: #8a6a1f; --done: #2f7d3a; }
+    @media (prefers-color-scheme: dark) { :root { --fg: #e8e0d4; --bg: #0f0d0b; --muted: #a59a8a; --line: #2e2922; --accent: #c8a252; --done: #5fbf6a; } }
+    body { font: 16px/1.6 system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 24px 16px 48px; color: var(--fg); background: var(--bg); }
+    h1 { font-size: 26px; margin-bottom: 0; } h1 + p { color: var(--muted); margin-top: 4px; }
+    h2 { font-size: 18px; margin-top: 30px; padding-top: 14px; border-top: 1px solid var(--line); }
+    a { color: var(--accent); }
+    code { font-size: 14px; background: rgba(127,127,127,.15); padding: 1px 5px; border-radius: 4px; word-break: break-all; }
+    ul.checks { list-style: none; padding: 0; }
+    ul.checks li { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    ul.checks label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+    ul.checks input { width: 20px; height: 20px; margin-top: 3px; flex: none; accent-color: var(--done); }
+    ul.checks input:checked + span { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--done); }
+    .progress { position: sticky; top: 0; background: var(--bg); padding: 8px 0; border-bottom: 1px solid var(--line); font-size: 14px; color: var(--muted); z-index: 1; }
+    .progress button { float: right; font: inherit; color: var(--accent); background: none; border: 0; cursor: pointer; padding: 0; }
+  </style>
+</head>
+<body>
+<main>
+<div class="progress"><span id="prog"></span><button type="button" id="reset">Clear ticks</button></div>
+<h1>Perfect Roll — Tester Checklist</h1>
+<p>Nov 3, 2026 · Jim</p>
+<h2>Before you start</h2>
+<p>Perfect Roll is a Diablo II: Resurrected gear tracker for Android. It keeps your characters, their gear and a shared stash, and suggests upgrades for your build. This is the closed test on Google Play, starting with version 1.4.3. Please work through the checks below and tell me anything that breaks, looks wrong or confuses you.</p>
+<p><b>Please stay in the test for at least 14 days.</b> Google only lets me publish the app once at least 12 testers have stayed opted in for 14 days in a row, and it checks that the app is actually being used. Open it a few times a week, even briefly. Leaving the test and rejoining restarts your 14 days.</p>
+<p><b>Join the test and install (Android only)</b></p>
+<ol>
+<li>On your phone, open the <b>opt-in link</b> I sent you. Use the Google account whose email address you gave me.</li>
+<li>Tap <b>Become a tester</b> (or <b>Accept invitation</b>).</li>
+<li>Tap the <b>download it on Google Play</b> link, then <b>Install</b>.</li>
+<li>Open <b>Perfect Roll</b>. The version number shows next to the name.</li>
+</ol>
+<p>Updates arrive through Google Play like any other app.</p>
+<p><b>Had an earlier test copy (an .apk file)?</b> Export a backup first (⋯ menu → <b>Export account backup</b>), uninstall the old copy, install from Google Play, then import the backup. Android won't install the Play version over the old copy, and uninstalling erases anything that isn't backed up.</p>
+<p>Your data stays on your phone only. Nothing is sent to me unless you send a backup file yourself.</p>
+<h2>Accounts and sign-in</h2>
+<ul class="checks">
+<li><label><input type="checkbox" data-k="c1"> <span>Create an account with a name and password. You land on an empty screen that offers <b>+ New character</b>.</span></label></li>
+<li><label><input type="checkbox" data-k="c2"> <span>Lock the app with the 🔒 button, then unlock it with your password. Everything you entered is still there.</span></label></li>
+<li><label><input type="checkbox" data-k="c3"> <span>Try unlocking with a wrong password. You get an error and stay locked out.</span></label></li>
+<li><label><input type="checkbox" data-k="c4"> <span>Close the app completely and reopen it. Your account is still listed and unlocks normally.</span></label></li>
+<li><label><input type="checkbox" data-k="c5"> <span>Create a second account, add something to it, then switch back. Each account shows only its own characters and stash.</span></label></li>
+<li><label><input type="checkbox" data-k="c6"> <span>Delete the test account from the sign-in screen. It asks you to type the account name to confirm, then removes it.</span></label></li>
+</ul>
+<h2>Characters and gear</h2>
+<p>Use one of your real characters if you can; real gear finds more problems than made-up gear.</p>
+<ul class="checks">
+<li><label><input type="checkbox" data-k="c7"> <span>Add a character with <b>+ New</b>. Set its class, level and build. The build list shows builds for that class.</span></label></li>
+<li><label><input type="checkbox" data-k="c8"> <span><b>Gear</b> tab: fill each slot with an item you actually wear. The item list is easy to search and the right items appear for each slot.</span></label></li>
+<li><label><input type="checkbox" data-k="c9"> <span><b>Mercenary</b> tab: pick your merc's type (Act 1, 2, 3 or 5) and its aura or element, set its level, then add its gear. Only weapons that merc can use are listed, and an Act 3 merc gets a shield slot.</span></label></li>
+<li><label><input type="checkbox" data-k="c10"> <span><b>Charms</b> tab: add your charms. The cell count goes up as you add them.</span></label></li>
+<li><label><input type="checkbox" data-k="c11"> <span>Add a second character and switch between them with the picker at the top. Each keeps its own gear.</span></label></li>
+<li><label><input type="checkbox" data-k="c12"> <span>Rename a character by editing its name; the picker at the top updates. Delete one with <b>Delete character</b> in the ⋯ menu.</span></label></li>
+</ul>
+<h2>Shared stash</h2>
+<p>The stash is shared by every character on the account.</p>
+<ul class="checks">
+<li><label><input type="checkbox" data-k="c13"> <span>Add a few items you're holding: some gear, a few runes and a gem. The <b>Stash</b> tab count goes up.</span></label></li>
+<li><label><input type="checkbox" data-k="c14"> <span>Add the same rune twice. It stacks into one row with a count instead of two rows.</span></label></li>
+<li><label><input type="checkbox" data-k="c15"> <span>Change a count with − and +, and by tapping the number and typing a new total.</span></label></li>
+<li><label><input type="checkbox" data-k="c16"> <span>Type where an item is kept in its <b>📍 Location</b> box, such as a mule's name. Close and reopen the app; the location is still there.</span></label></li>
+<li><label><input type="checkbox" data-k="c17"> <span>Tap the Location box on another item. Your 5 most recently used locations are listed; tap one to use it.</span></label></li>
+<li><label><input type="checkbox" data-k="c18"> <span>Type part of a location, such as "stash". The list narrows to the 5 most recent that match (for example Shared stash 4, 3, 2, 1).</span></label></li>
+<li><label><input type="checkbox" data-k="c19"> <span>Type a mule's name in <b>Find in your stash</b>. Only the items on that mule show.</span></label></li>
+<li><label><input type="checkbox" data-k="c20"> <span>Tap <b>Equip</b> on a stash item. It moves onto the character, and whatever was worn goes back into the stash.</span></label></li>
+<li><label><input type="checkbox" data-k="c21"> <span>Add a runeword base: Gear type <b>Base (for runewords)</b>, pick one (e.g. Monarch), set sockets and Ethereal. It lists the runewords that fit, with ✓ where you already have the runes.</span></label></li>
+<li><label><input type="checkbox" data-k="c22"> <span>Use <b>Not in the list? Add a custom item</b> to add something the list doesn't have.</span></label></li>
+<li><label><input type="checkbox" data-k="c23"> <span>Remove an item with ✕.</span></label></li>
+</ul>
+<h2>Photos, planning tabs and upgrades</h2>
+<p><b>Reading stats from a photo.</b> Point your phone at an item tooltip in the game, straight on, with the whole box in frame. The photo is read on your phone and not kept.</p>
+<ul class="checks">
+<li><label><input type="checkbox" data-k="c24"> <span>Use <b>📷 Take photo of gear</b> at the top. The item and its stats are recognized.</span></label></li>
+<li><label><input type="checkbox" data-k="c25"> <span>On an item you own, use <b>📷 Scan stats</b> and <b>🖼 From gallery</b>. The <b>Actual stats</b> fill in. Note any stat that was misread, and what it should have said.</span></label></li>
+<li><label><input type="checkbox" data-k="c26"> <span>Use <b>✎ Type stats</b> to correct a stat by hand.</span></label></li>
+<li><label><input type="checkbox" data-k="c27"> <span>On a helm, armor, shield or weapon that isn't a runeword, open <b>Sockets</b>, set how many it has, and pick what's in each (a rune, a gem or a jewel). The bonus it shows matches the game (a Ruby is life in a helm but fire resist in a shield).</span></label></li>
+</ul>
+<p><b>Planning tabs</b></p>
+<ul class="checks">
+<li><label><input type="checkbox" data-k="c28"> <span><b>Runewords</b>: with runes in your stash, it lists what you can make and what you're one or two runes away from, and whether a fitting base is in your stash.</span></label></li>
+<li><label><input type="checkbox" data-k="c29"> <span><b>Runewords → Plan a runeword</b>: type a runeword you want (Enigma, HotO…). It shows the runes you hold, the cube steps to make missing ones, and what's left to find.</span></label></li>
+<li><label><input type="checkbox" data-k="c30"> <span><b>Gems &amp; Cube</b>: with gems and runes in your stash, it shows the cube upgrades you can do. Try the <b>Rune upgrade checker</b> with a rune you'd like to make.</span></label></li>
+<li><label><input type="checkbox" data-k="c31"> <span><b>Skills</b>: shows a skill plan for your character's build and level.</span></label></li>
+<li><label><input type="checkbox" data-k="c32"> <span><b>Upgrades</b>: stash items that beat your current gear show first, with their 📍 location. Below are suggestions per slot, with Traderie links for items you don't have.</span></label></li>
+<li><label><input type="checkbox" data-k="c33"> <span><b>Upgrades → Stats &amp; resists</b>: set your difficulty and Anya scrolls. Compare the resists with your character screen in the game, and tell me how far off they are.</span></label></li>
+<li><label><input type="checkbox" data-k="c34"> <span><b>Upgrades → breakpoints</b>: FHR (and FCR for casters, attack speed for melee) shows your frames and how much more you need for the next breakpoint.</span></label></li>
+<li><label><input type="checkbox" data-k="c35"> <span>Open a Traderie link. It opens the right item on Traderie.</span></label></li>
+</ul>
+<h2>Backup and restore</h2>
+<p>This matters most: it's how you keep your data when you move to the Play Store version.</p>
+<ul class="checks">
+<li><label><input type="checkbox" data-k="c36"> <span>Use <b>Export account backup</b> in the ⋯ menu. The app confirms the file name it saved to Downloads, which ends with the date and app version (e.g. <code>perfect-roll-Ladder-2026-11-03-v1.4.3.json</code>).</span></label></li>
+<li><label><input type="checkbox" data-k="c37"> <span>Find that file in your phone's Files app, in Downloads.</span></label></li>
+<li><label><input type="checkbox" data-k="c38"> <span>Lock the app, then use <b>Import account backup</b> on the sign-in screen and pick the file. Your characters, gear, stash and locations all come back.</span></label></li>
+<li><label><input type="checkbox" data-k="c39"> <span>Import a backup of an account that's already on the phone. It's added as a separate copy (e.g. "Ladder (2)") and never overwrites the original; delete whichever copy you don't need.</span></label></li>
+</ul>
+<p>Export a backup regularly. Your characters exist only on your phone, so a backup is the only copy if the phone is lost or reset.</p>
+<h2>General and reporting problems</h2>
+<ul class="checks">
+<li><label><input type="checkbox" data-k="c40"> <span>Text is readable and nothing runs off the edge of the screen.</span></label></li>
+<li><label><input type="checkbox" data-k="c41"> <span>Turn the phone sideways and back. The layout still works.</span></label></li>
+<li><label><input type="checkbox" data-k="c42"> <span>Switch your phone between light and dark mode. The app stays readable.</span></label></li>
+<li><label><input type="checkbox" data-k="c43"> <span>Leave the app, use another app for a while, and come back. Nothing you typed is lost.</span></label></li>
+<li><label><input type="checkbox" data-k="c44"> <span>Anything that felt slow, confusing or missing.</span></label></li>
+</ul>
+<p><b>How to report a problem.</b> Send me a text or email with:</p>
+<ol>
+<li>Your phone model and Android version (Settings → About phone).</li>
+<li>What you did, step by step.</li>
+<li>What you expected, and what happened instead.</li>
+<li>A screenshot if you can.</li>
+</ol>
+<p>Thanks for testing.</p>
+<p><a href="./">← Back to Perfect Roll</a></p>
+</main>
+<script>
+  // Ticks are remembered on this device only.
+  (function () {
+    const KEY = "pr-tester-checklist";
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
+    const boxes = [...document.querySelectorAll("input[data-k]")];
+    const prog = document.getElementById("prog");
+    const show = () => { const done = boxes.filter((b) => b.checked).length; prog.textContent = `${done} of ${boxes.length} checks done (saved on this device)`; };
+    boxes.forEach((b) => {
+      b.checked = !!saved[b.dataset.k];
+      b.addEventListener("change", () => { saved[b.dataset.k] = b.checked || undefined; try { localStorage.setItem(KEY, JSON.stringify(saved)); } catch (e) {} show(); });
+    });
+    document.getElementById("reset").onclick = () => { if (!confirm("Clear all ticks?")) return; saved = {}; try { localStorage.removeItem(KEY); } catch (e) {} boxes.forEach((b) => (b.checked = false)); show(); };
+    show();
+  })();
+</script>
+</body>
+</html>
