@@ -389,3 +389,13 @@ input.qn:focus { outline: none; border-color: var(--accent); background: rgba(12
 .base-fits small { opacity: .75; }
 .rw-base { margin-top: 2px; }
 .rw-base.ok { color: var(--good); }
+
+/* Socket fillers */
+.sockets { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; }
+.sockets summary { cursor: pointer; color: var(--accent); font-size: 14px; }
+.sock-n { margin: 8px 0 4px; max-width: 200px; }
+.sock-row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.sock-row select { flex: 1; min-width: 160px; }
+.sock-row input { flex: 1; min-width: 160px; }
+.sock-adds { margin-top: 8px; }
+.sock-extra { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; }

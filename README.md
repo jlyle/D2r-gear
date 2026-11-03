@@ -43,6 +43,11 @@ Good to know:
 - **Find in your stash** searches actual stats too, so you can look up "faster cast" or "all resist" across everything you own.
 - Upgrade suggestions are ranked by item and build tier, not by your exact rolls — actual stats are for your own comparison.
 
+## Socket fillers
+Helms, body armor, shields and weapons you're wearing (and the merc's) have a **Sockets** section under the item. Set how many sockets it has, then pick what's in each one: any rune, any gem (Chipped to Perfect), or a jewel with its stats typed in (e.g. `15% IAS, 30 all res`). It shows what they add, using the right bonus for the item: a Ruby adds life in a helm or armor but fire resist in a shield, and an Um is +15 all res in armor but +22 in a shield.
+
+What's in the sockets counts toward Stats & resists, FCR, FHR and IAS. If the item has **actual stats** read from its in-game tooltip, those already include the sockets, so they aren't added twice; tick **Count these on top of the actual stats** if you typed the item's own rolls only. Runewords have no Sockets section, since their sockets hold the runes. Equipping from the stash and swapping back keep an item's sockets.
+
 ## Runes
 Runes live in the shared stash like any other item, so every character on the account sees the same pile.
 

@@ -329,6 +329,18 @@ const FCR_BREAKPOINTS = {
   Warlock:     [0, 9, 18, 30, 48, 75, 125], // community-reported (matches Necromancer)
 };
 
+// What a gem adds in a socket, by grade (Chipped, Flawed, normal, Flawless, Perfect).
+// {n} is replaced by the grade's value. Weapon effects that are pure damage are described, not counted.
+const GEM_SOCKET = {
+  Ruby:     { weapon: ["Adds fire damage"], armor: [["+{n} to Life", [10, 17, 24, 31, 38]]], shield: [["Fire Resist +{n}%", [12, 16, 22, 28, 40]]] },
+  Sapphire: { weapon: ["Adds cold damage"], armor: [["+{n} to Mana", [10, 17, 24, 31, 38]]], shield: [["Cold Resist +{n}%", [12, 16, 22, 28, 40]]] },
+  Topaz:    { weapon: ["Adds lightning damage"], armor: [["{n}% Better Chance of Getting Magic Items", [9, 13, 16, 20, 24]]], shield: [["Lightning Resist +{n}%", [12, 16, 22, 28, 40]]] },
+  Emerald:  { weapon: ["Adds poison damage"], armor: [["+{n} to Dexterity", [3, 4, 6, 8, 10]]], shield: [["Poison Resist +{n}%", [12, 16, 22, 28, 40]]] },
+  Diamond:  { weapon: [["+{n}% Damage to Undead", [28, 34, 44, 54, 64]]], armor: [["+{n} to Attack Rating", [20, 40, 60, 80, 100]]], shield: [["All Resistances +{n}", [6, 8, 11, 14, 19]]] },
+  Amethyst: { weapon: [["+{n} to Attack Rating", [40, 60, 80, 100, 150]]], armor: [["+{n} to Strength", [3, 4, 6, 8, 10]]], shield: [["+{n} Defense", [8, 12, 18, 24, 30]]] },
+  Skull:    { weapon: [["{n}% Life Stolen per Hit", [2, 2, 3, 3, 4]], ["{n}% Mana Stolen per Hit", [1, 2, 2, 3, 3]]], armor: [["Replenish Life +{n}", [2, 3, 3, 4, 5]], ["Regenerate Mana {n}%", [8, 8, 12, 12, 19]]], shield: [["Attacker Takes Damage of {n}", [4, 8, 12, 16, 20]]] },
+};
+
 // Faster Hit Recovery: [frames at 0 FHR, FHR needed for each frame less]. Source: maxroll.gg breakpoints.
 // Warlock FHR isn't published yet, so it's left out.
 const FHR_BREAKPOINTS = {

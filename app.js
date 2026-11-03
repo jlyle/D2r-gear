@@ -763,6 +763,88 @@
     });
   }
 
+  // ---------- socket fillers (runes, gems, jewels in an item's sockets) ----------
+  // Which socket table an item uses: weapon, shield, or armor (body armor and helms).
+  function socketCat(it) {
+    if (it.slot === "weapon") return "weapon";
+    if (it.slot === "offhand") return WEAPON_BASES[it.base] ? "weapon" : "shield";
+    return "armor";
+  }
+  const SOCKET_SLOTS = ["helm", "armor", "weapon", "offhand"];
+  const socketable = (it) => it && SOCKET_SLOTS.includes(it.slot) && it.type !== "runeword";
+  const maxSockets = (it) => ITEM_BASES[it.base]?.sock || { helm: 3, armor: 4, offhand: 4, weapon: 6 }[it.slot] || 0;
+  // Stat lines one filler adds. f: "r:Ist" | "g:Perfect Ruby" | { j: "15% IAS, 40% ED" }
+  function fillerLines(f, cat) {
+    if (!f) return [];
+    if (typeof f === "object") return String(f.j || "").split(/[,\n]+/).map((x) => x.trim()).filter(Boolean);
+    const [kind, name] = [f.slice(0, 1), f.slice(2)];
+    if (kind === "r") {
+      const m = /Weapon:\s*(.*?),\s*Armor\/helm:\s*(.*)$/.exec(byName.get(name + " Rune")?.stats || "");
+      if (!m) return [];
+      if (cat === "weapon") return m[1].split(/,\s+/);
+      let main = m[2]; const paren = /\s*\(shield([^)]*)\)/.exec(main);
+      main = main.replace(/\s*\(shield[^)]*\)/, "");
+      if (cat === "shield" && paren) {
+        const inner = paren[1].trim();
+        if (inner.startsWith(":")) main = inner.slice(1).trim();
+        else if (/[a-z]/i.test(inner)) main = inner;
+        else main = main.replace(/[+-]?\d+(?=%?\s*$)/, inner.replace(/%$/, ""));
+      }
+      return [main];
+    }
+    if (kind === "g") {
+      const parts = name.split(" "); const type = parts.pop(); const grade = GEM_GRADES.indexOf(parts.join(" "));
+      return (GEM_SOCKET[type]?.[cat] || []).map((x) => (Array.isArray(x) ? x[0].replace("{n}", x[1][grade]) : x));
+    }
+    return [];
+  }
+  const fillerName = (f) => (!f ? "" : typeof f === "object" ? "Jewel" : f.slice(2) + (f[0] === "r" ? " rune" : ""));
+  // Socket lines to count for an entry. Actual stats read from a tooltip already include sockets.
+  function socketLines(entry, it) {
+    if (!socketable(it) || !entry?.fill?.length) return [];
+    if (noteLines(entry.note).length && !entry.sockExtra) return [];
+    const cat = socketCat(it);
+    return entry.fill.slice(0, entry.sock || 0).flatMap((f) => fillerLines(f, cat));
+  }
+  function socketBlockHTML(entry, it) {
+    const max = maxSockets(it);
+    const n = Math.min(Number(entry.sock) || 0, max);
+    const fill = entry.fill || [];
+    const cat = socketCat(it);
+    const gemOpts = GEM_TYPES.map((t) => `<optgroup label="${t}s">${GEM_GRADES.slice().reverse().map((g) => { const nm = gemName(g, t); return `<option value="g:${esc(nm)}">${esc(nm)}</option>`; }).join("")}</optgroup>`).join("");
+    const runeOpts = `<optgroup label="Runes">${RUNE_ORDER.map((r) => `<option value="r:${r}">${r}</option>`).join("")}</optgroup>`;
+    const sel = (i) => {
+      const f = fill[i]; const v = !f ? "" : typeof f === "object" ? "j" : f;
+      return `<div class="sock-row"><select class="sock-fill" data-i="${i}" aria-label="Socket ${i + 1}"><option value="">Socket ${i + 1}: empty</option>${runeOpts}${gemOpts}<optgroup label="Jewel"><option value="j">Jewel (type its stats)</option></optgroup></select>
+        ${v === "j" ? `<input type="text" class="sock-jewel" data-i="${i}" maxlength="120" value="${esc(f.j || "")}" placeholder="e.g. 15% IAS, 30 all res">` : ""}</div>`.replace(`value="${esc(v)}"`, `value="${esc(v)}" selected`);
+    };
+    const lines = entry.fill ? entry.fill.slice(0, n).flatMap((f) => fillerLines(f, cat)) : [];
+    const hasActual = noteLines(entry.note).length > 0;
+    return `<details class="sockets" ${n ? "open" : ""}>
+        <summary>Sockets${n ? ` (${n}${fill.slice(0, n).filter(Boolean).length < n ? `, ${n - fill.slice(0, n).filter(Boolean).length} empty` : ""})` : ""}</summary>
+        <label class="field sock-n"><span>Number of sockets</span><select class="sock-count">${Array.from({ length: max + 1 }, (_, k) => `<option value="${k}" ${k === n ? "selected" : ""}>${k === 0 ? "None" : k}</option>`).join("")}</select></label>
+        ${Array.from({ length: n }, (_, i) => sel(i)).join("")}
+        ${lines.length ? `<p class="notes sock-adds">Adds: ${lines.map(esc).join(" · ")}</p>` : ""}
+        ${hasActual && n ? `<label class="check sock-extra"><input type="checkbox" class="sock-extra-in" ${entry.sockExtra ? "checked" : ""}> Count these on top of the actual stats</label><p class="notes">Actual stats read from the in-game tooltip already include what's in the sockets, so they aren't added again unless you tick this.</p>` : ""}
+      </details>`;
+  }
+  function wireSockets(root, getEntry) {
+    root.querySelectorAll(".sockets").forEach((box) => {
+      const entry = getEntry(box);
+      if (!entry) return;
+      const sc = $(".sock-count", box);
+      if (sc) sc.onchange = () => { entry.sock = Number(sc.value) || 0; entry.fill = (entry.fill || []).slice(0, entry.sock); save(); render(); };
+      box.querySelectorAll(".sock-fill").forEach((sel) => (sel.onchange = () => {
+        const i = Number(sel.dataset.i); entry.fill = entry.fill || [];
+        entry.fill[i] = sel.value === "j" ? { j: "" } : sel.value || null;
+        save(); render();
+      }));
+      box.querySelectorAll(".sock-jewel").forEach((inp) => (inp.onchange = () => { const i = Number(inp.dataset.i); entry.fill = entry.fill || []; entry.fill[i] = { j: inp.value.trim() }; save(); render(); }));
+      const ex = $(".sock-extra-in", box);
+      if (ex) ex.onchange = () => { entry.sockExtra = ex.checked || undefined; save(); render(); };
+    });
+  }
+
   function renderSlots(body, c, slots) {
     body.innerHTML = `<div class="grid">${slots.map((s) => {
       const g = c.gear[s.key] || {};
@@ -772,6 +854,7 @@
         ${searchHTML(`Search ${s.label.toLowerCase()}…`)}
         <select class="pick" aria-label="${s.label}">${itemOptions(c, s, g.item)}</select>
         ${entryHTML(g, it, { noteKey: s.key })}
+        ${socketable(it) ? socketBlockHTML(g, it) : ""}
       </div>`;
     }).join("")}</div>`;
     body.querySelectorAll(".slot").forEach((el) => {
@@ -789,6 +872,7 @@
       });
     });
     wireEntries(body, (k) => c.gear[k]);
+    wireSockets(body, (box) => c.gear[box.closest(".slot")?.dataset.slot]);
   }
 
   function renderMerc(body, c) {
@@ -926,8 +1010,13 @@
       c.charms.push({ id: uid(), added: Date.now(), item: it.name, note: entry.note || "" });
     } else {
       const old = c.gear[slotKey];
-      if (old?.item) addToStash(old.item, old.note || "");
-      c.gear[slotKey] = { item: it.name, note: entry.note || "" };
+      if (old?.item) {
+        if (old.sock || old.fill) state.stash.push({ ...old, id: uid(), added: Date.now() });
+        else addToStash(old.item, old.note || "");
+      }
+      const moved = { item: it.name, note: entry.note || "" };
+      for (const k of ["sock", "fill", "eth", "sockExtra"]) if (entry[k] !== undefined) moved[k] = entry[k];
+      c.gear[slotKey] = moved;
     }
     save(); render();
   }
@@ -1475,8 +1564,8 @@
     if (/enemy|target|monster|pierce|sunder|skill damage|\bvs\b/.test(l)) return out;
     l = l.replace(new RegExp(SUM_N + "%\\s*(?:to\\s+)?max(?:imum)?\\s+" + SUM_EL + "\\s+res\\w*", "g"), (m, n, el) => { elemsIn(el).forEach((e) => add("max_" + e, n)); return " "; });
     l = l.replace(new RegExp(SUM_N + "%?\\s*(?:to\\s+)?all res\\w*", "g"), (m, n) => { add("allres", n); return " "; });
-    l = l.replace(/all resist\w*\s*[:.]?\s*\+?(\d+)%?/g, (m, n) => { add("allres", n); return " "; });
-    l = l.replace(new RegExp(SUM_EL + "\\s+resist\\w*\\s*[:.]?\\s*" + SUM_N + "%?", "g"), (m, el, n) => { elemsIn(el).forEach((e) => add(e, n)); return " "; });
+    l = l.replace(/all res\w*\s*[:.]?\s*\+?(\d+)%?/g, (m, n) => { add("allres", n); return " "; });
+    l = l.replace(new RegExp(SUM_EL + "\\s+res\\w*\\s*[:.]?\\s*" + SUM_N + "%?", "g"), (m, el, n) => { elemsIn(el).forEach((e) => add(e, n)); return " "; });
     l = l.replace(new RegExp(SUM_N + "%?\\s*(?:to\\s+)?" + SUM_EL + "\\s+res\\w*", "g"), (m, n, el) => { elemsIn(el).forEach((e) => add(e, n)); return " "; });
     let m;
     if ((m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?all skills")))) add("skills", m[1]);
@@ -1484,7 +1573,7 @@
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster cast rate|fcr)\\b")))) add("fcr", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster run/walk|frw)\\b")))) add("frw", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:increased attack speed|ias)\\b")))) add("ias", m[1]);
-    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:better chance of getting magic items|mf|magic find)\\b")))) add("mf", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:better chance of (?:getting )?magic items|mf|magic find)\\b")))) add("mf", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:life stolen per hit|ll)\\b")))) add("ll", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:chance of crushing blow|cb)\\b")))) add("cb", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:deadly strike|ds)\\b")))) add("ds", m[1]);
@@ -1511,7 +1600,7 @@
     const take = (label, entry) => {
       const it = byName.get(entry?.item); if (!it) return;
       const mine = noteLines(entry.note);
-      const lines = mine.length ? mine : statLines(it.stats);
+      const lines = [...(mine.length ? mine : statLines(it.stats)), ...socketLines(entry, it)];
       const got = {};
       for (const ln of lines) for (const [k, v] of parseStatLine(ln)) {
         if (k.startsWith("aura:")) { got[k] = Math.max(got[k] || 0, v); totals[k] = Math.max(totals[k] || 0, v); continue; }
