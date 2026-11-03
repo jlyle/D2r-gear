@@ -330,14 +330,9 @@
   }
   const fitsLevel = (it, c) => !c.level || !it.req || it.req <= Number(c.level);
 
+  // FCR from worn gear and charms (actual stats when entered, else lowest typical roll), plus the manual extra.
   function fcrTotal(c) {
-    let total = Number(c.extraFcr) || 0;
-    for (const s of GEAR_SLOTS) {
-      if (s.key === "swap") continue;
-      const it = byName.get(c.gear[s.key]?.item);
-      if (it?.fcr) total += it.fcr;
-    }
-    return total;
+    return (statSummary(c).totals.fcr || 0) + (Number(c.extraFcr) || 0);
   }
 
   // Items kept in the inventory besides charms (all on unless turned off for this character).
@@ -803,6 +798,7 @@
         <h3>Merc stats &amp; resists</h3>
         <div class="res-grid">${resLine}</div>
         <p class="notes">Resists from gear only. The merc's own resists rise with its level, and the difficulty penalty applies, so check its stat screen for the final number.</p>
+        ${(() => { const rows = bpRows(MERC_FHR[t.key]); const f = sum.totals.fhr || 0; return `<h4 class="rw-sub">Faster Hit Recovery: ${f}% · ${framesAt(rows, f)} frames</h4>${bpChips(rows, f, "%")}<p class="notes">${bpNext(rows, f, "FHR")}</p>`; })()}
         <p class="notes">Auras: ${esc(t.key === "a2" ? `${variant} (hired)` : "none hired")}${auras.length ? `, plus from gear: ${auras.map(esc).join(", ")}` : ""}</p>
         ${otherStatsHTML(sum.totals)}
         ${typicalCount ? `<p class="notes">${typicalCount} item${typicalCount === 1 ? " has" : "s have"} no actual stats, so ${typicalCount === 1 ? "its" : "their"} lowest typical roll is used.</p>` : ""}
@@ -1412,6 +1408,7 @@
     let m;
     if ((m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?all skills")))) add("skills", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster hit recovery|fhr)\\b")))) add("fhr", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster cast rate|fcr)\\b")))) add("fcr", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster run/walk|frw)\\b")))) add("frw", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:increased attack speed|ias)\\b")))) add("ias", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:better chance of getting magic items|mf|magic find)\\b")))) add("mf", m[1]);
@@ -1430,7 +1427,7 @@
     return out;
   }
   const SUM_OTHER = [["skills", "All skills", ""], ["life", "Life", ""], ["mana", "Mana", ""], ["fhr", "FHR", "%"], ["frw", "FRW", "%"], ["ias", "IAS", "%"], ["ll", "Life leech", "%"], ["cb", "Crushing blow", "%"], ["ds", "Deadly strike", "%"], ["mf", "Magic find", "%"], ["dr", "Phys. dmg reduced", "%"], ["str", "Strength", ""], ["dex", "Dexterity", ""], ["vit", "Vitality", ""], ["enr", "Energy", ""]];
-  const SUM_LABEL = { allres: "all res", fire: "fire res", cold: "cold res", light: "light res", poison: "poison res", max_fire: "max fire", max_cold: "max cold", max_light: "max light", max_poison: "max poison", skills: "skills", life: "life", mana: "mana", fhr: "% FHR", frw: "% FRW", ias: "% IAS", mf: "% MF", dr: "% DR", ll: "% LL", cb: "% CB", ds: "% DS", str: "str", dex: "dex", vit: "vit", enr: "energy" };
+  const SUM_LABEL = { allres: "all res", fire: "fire res", cold: "cold res", light: "light res", poison: "poison res", max_fire: "max fire", max_cold: "max cold", max_light: "max light", max_poison: "max poison", skills: "skills", life: "life", mana: "mana", fhr: "% FHR", frw: "% FRW", ias: "% IAS", mf: "% MF", dr: "% DR", fcr: "% FCR", ll: "% LL", cb: "% CB", ds: "% DS", str: "str", dex: "dex", vit: "vit", enr: "energy" };
   const fmtGot = (k, v) => k.startsWith("aura:") ? `${k.slice(5)} aura lvl ${v}` : `${v > 0 ? "+" : ""}${v}${String(SUM_LABEL[k] || k).startsWith("%") ? "" : " "}${SUM_LABEL[k] || k}`;
   const auraList = (totals) => Object.keys(totals).filter((k) => k.startsWith("aura:")).map((k) => `${k.slice(5)} (lvl ${totals[k]})`);
   const otherStatsHTML = (totals) => { const o = SUM_OTHER.filter(([k]) => totals[k]); return o.length ? `<dl class="ss-other">${o.map(([k, l, u]) => `<div><dt>${l}</dt><dd>${totals[k] > 0 ? "+" : ""}${totals[k]}${u}</dd></div>`).join("")}</dl>` : ""; };
@@ -1447,6 +1444,7 @@
         if (k.startsWith("aura:")) { got[k] = Math.max(got[k] || 0, v); totals[k] = Math.max(totals[k] || 0, v); continue; }
         got[k] = (got[k] || 0) + v; totals[k] = (totals[k] || 0) + v;
       }
+      if (!mine.length && it.fcr && !got.fcr) { got.fcr = it.fcr; totals.fcr = (totals.fcr || 0) + it.fcr; }
       sources.push({ label, it, actual: !!mine.length, got });
     };
     for (const s of slots) take(s.label, c.gear[s.key]);
@@ -1460,6 +1458,36 @@
     });
     return { totals, sources, res, diff, anya };
   }
+  // ---------- breakpoints ----------
+  // Weapon base for the attack-speed check: the item's own base, or the one the player picked for a runeword.
+  function weaponBaseOf(c) {
+    const it = byName.get(c.gear.weapon?.item);
+    if (!it) return null;
+    const name = WEAPON_BASES[it.base] ? it.base : WEAPON_BASES[c.iasBase] ? c.iasBase : null;
+    return { it, name, wb: name ? WEAPON_BASES[name] : null };
+  }
+  function fhrTable(c) {
+    const t = FHR_BREAKPOINTS[c.cls];
+    if (!t) return null;
+    const wb = weaponBaseOf(c)?.wb;
+    let key = "";
+    if (c.cls === "Druid" && wb && wb.wc === "1hs" && !wb.th) key = "1-handed swinging weapon";
+    if (c.cls === "Paladin" && wb && ["spea", "aspe", "staf"].includes(wb.type)) key = "spear or staff";
+    return { key, data: t[key] };
+  }
+  // [{ v: breakpoint, frames }] and the frames at value x.
+  function bpRows([f0, bps]) { return bps.map((v, i) => ({ v, frames: f0 - i })); }
+  const framesAt = (rows, x) => rows.filter((r) => r.v <= x).pop()?.frames;
+  const bpChips = (rows, x, unit = "") => `<div class="bps">${rows.map((r) => `<span class="${r.v <= x ? "hit" : ""}" title="${r.frames} frames">${r.v}${unit}<small>·${r.frames}f</small></span>`).join("")}</div>`;
+  const bpNext = (rows, x, what) => { const n = rows.find((r) => r.v > x); return n ? `next: ${n.v}% (${n.frames} frames), ${n.v - x}% more ${what}` : "top breakpoint reached"; };
+  // Normal-attack frames: ceil(256 × (frames − start) / floor(speed × (100 + EIAS) / 100)) − 1.
+  function attackFrames(anim, eias) {
+    const [fpd, sf, sp = 256] = anim;
+    const e = Math.max(-85, Math.min(75, eias));
+    return Math.ceil((256 * (fpd - sf)) / Math.floor((sp * (100 + e)) / 100)) - 1;
+  }
+  const eiasFrom = (ias, sias, wsm) => Math.floor((120 * ias) / (120 + ias)) + sias - wsm;
+
   function renderUpgrades(body, c) {
     const b = buildOf(c);
     if (!b) { body.innerHTML = `<div class="card"><p>No build guide for ${esc(c.cls)} yet — gear tracking still works.</p></div>`; return; }
@@ -1483,7 +1511,7 @@
         <div class="stat-big">${fcr}%</div>
         <div class="notes">Target ${b.fcrTarget}% · ${fcr >= b.fcrTarget ? `<span class="ok">target reached</span>` : `${b.fcrTarget - fcr}% short`}${next !== undefined ? ` · next breakpoint ${next}%` : ""}</div>
         <div class="bps">${bps.map((v) => `<span class="${v <= fcr ? "hit" : ""} ${v === b.fcrTarget ? "target" : ""}">${v}</span>`).join("")}</div>
-        <div class="field" style="margin-top:10px"><label>Extra FCR from rares, rolls, charms</label><input type="number" id="extraFcr" min="0" max="200" value="${esc(c.extraFcr || 0)}"></div>
+        <div class="field" style="margin-top:10px"><label>Extra FCR not on your items' stats (e.g. jewels)</label><input type="number" id="extraFcr" min="0" max="200" value="${esc(c.extraFcr || 0)}"></div>
       </div>`;
     }
 
@@ -1512,6 +1540,58 @@
         </details>
       </div>`;
 
+    // FHR panel
+    const fhrT = fhrTable(c);
+    const fhrNow = sum.totals.fhr || 0;
+    let fhrHtml;
+    if (fhrT) {
+      const rows = bpRows(fhrT.data);
+      fhrHtml = `<div class="card"><h3>Faster Hit Recovery</h3>
+        <div class="stat-big">${fhrNow}% <small class="frames">${framesAt(rows, fhrNow)} frames</small></div>
+        <div class="notes">${bpNext(rows, fhrNow, "FHR")}${fhrT.key ? ` · ${esc(c.cls)} with a ${esc(fhrT.key)}` : ""}</div>
+        ${bpChips(rows, fhrNow, "%")}</div>`;
+    } else fhrHtml = `<div class="card"><h3>Faster Hit Recovery</h3><div class="stat-big">${fhrNow}%</div><div class="notes">${esc(c.cls)} FHR breakpoints aren't published yet.</div></div>`;
+
+    // IAS panel: normal attack with the equipped weapon
+    let iasHtml = "";
+    if (!b.caster) {
+      const wpn = weaponBaseOf(c);
+      const anims = ATTACK_ANIM[c.cls];
+      const sias = Number(c.sias) || 0;
+      const gearIas = sum.totals.ias || 0;
+      let inner;
+      if (!anims) inner = `<p class="notes">${esc(c.cls)} attack animations aren't published yet.</p>`;
+      else if (!wpn) inner = `<p class="notes">Equip a weapon on the Gear tab to check attack speed.</p>`;
+      else if (!wpn.wb) inner = `<p class="notes">Pick the base item your ${esc(wpn.it.name)} is made in:</p>`;
+      else {
+        const wc = wpn.wb.th && !(c.cls === "Barbarian" && wpn.wb.oot) ? wpn.wb.wc2 : wpn.wb.wc;
+        const anim = anims[wc];
+        if (!anim) inner = `<p class="notes">${esc(c.cls)} can't attack normally with a ${esc(wpn.name)}.</p>`;
+        else {
+          const cur = attackFrames(anim, eiasFrom(gearIas, sias, wpn.wb.wsm));
+          const rows = [];
+          let prev = null;
+          for (let ias = 0; ias <= 400; ias++) {
+            const f = attackFrames(anim, eiasFrom(ias, sias, wpn.wb.wsm));
+            if (f !== prev) { rows.push({ v: ias, frames: f }); prev = f; }
+            if (eiasFrom(ias, sias, wpn.wb.wsm) >= 75) break;
+          }
+          inner = `<div class="stat-big">${cur} <small class="frames">frames · ${(25 / cur).toFixed(2)} attacks/s</small></div>
+            <div class="notes">${gearIas}% IAS from gear${sias ? ` + ${sias} skill IAS` : ""} · ${esc(wpn.name)} speed ${wpn.wb.wsm > 0 ? "+" : ""}${wpn.wb.wsm} · ${bpNext(rows, gearIas, "IAS")}</div>
+            ${bpChips(rows, gearIas, "%")}`;
+        }
+      }
+      const baseList = Object.keys(WEAPON_BASES).sort();
+      const needBase = wpn && !WEAPON_BASES[wpn.it.base];
+      iasHtml = `<div class="card ias-card"><h3>Attack speed (IAS)</h3>${inner}
+        <div class="ias-ctl">
+          ${needBase ? `<div class="field"><label for="iasBase">Base item</label><input type="search" id="iasBase" list="iasBases" value="${esc(c.iasBase || "")}" placeholder="e.g. Phase Blade"><datalist id="iasBases">${baseList.map((n) => `<option value="${esc(n)}">`).join("")}</datalist></div>` : ""}
+          <div class="field"><label for="sias">Skill IAS</label><input type="number" id="sias" min="0" max="200" inputmode="numeric" value="${esc(c.sias || 0)}"></div>
+        </div>
+        <p class="notes">Skill IAS is from Fanaticism, Burst of Speed, Frenzy and the like. This checks the normal attack and skills that use it. Skills with their own animation (Zeal, Fury, Whirlwind, Strafe, Jab, martial arts, wereforms) and dual wielding aren't modeled.</p>
+      </div>`;
+    }
+
     // charm checklist
     const have = new Set(c.charms.map((ch) => ch.item));
     const missingCharms = b.charms.filter((n) => !have.has(n));
@@ -1525,6 +1605,8 @@
           <div class="bar"><i style="width:${pct}%"></i></div>
         </div>
         ${fcrHtml}
+        ${fhrHtml}
+        ${iasHtml}
         <div class="card">
           <h3>Charms</h3>
           ${missingCharms.length ? `<div class="notes">Still to get:</div><ul class="sugg">${missingCharms.map((n) => `<li><span>${itemLine(byName.get(n))}</span><span class="runes">lvl ${byName.get(n)?.req ?? "?"}</span></li>`).join("")}</ul>` : `<p class="ok">All recommended charms in inventory.</p>`}
@@ -1553,6 +1635,8 @@
       const e = state.stash.find((x) => x.id === li.dataset.id);
       $(".eq", li).onclick = () => equipFromStash(c, e, li.dataset.slot);
     });
+    const sx = $("#sias"); if (sx) sx.onchange = (e) => { c.sias = Math.max(0, Number(e.target.value) || 0); save(); render(); };
+    const ib = $("#iasBase"); if (ib) ib.onchange = (e) => { const v = e.target.value.trim(); const k = Object.keys(WEAPON_BASES).find((n) => n.toLowerCase() === v.toLowerCase()); if (k || !v) { c.iasBase = k || undefined; save(); render(); } };
     $("#resDiff").onchange = (e) => { c.resDiff = e.target.value; save(); render(); };
     $("#anya").onchange = (e) => { c.anya = Number(e.target.value); save(); render(); };
     const ef = $("#extraFcr");

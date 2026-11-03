@@ -326,6 +326,35 @@ const FCR_BREAKPOINTS = {
   Warlock:     [0, 9, 18, 30, 48, 75, 125], // community-reported (matches Necromancer)
 };
 
+// Faster Hit Recovery: [frames at 0 FHR, FHR needed for each frame less]. Source: maxroll.gg breakpoints.
+// Warlock FHR isn't published yet, so it's left out.
+const FHR_BREAKPOINTS = {
+  Amazon:      { "": [11, [0, 6, 13, 20, 32, 52, 86, 174]] },
+  Assassin:    { "": [9, [0, 7, 15, 27, 48, 86, 200]] },
+  Barbarian:   { "": [9, [0, 7, 15, 27, 48, 86, 200]] },
+  Druid:       { "1-handed swinging weapon": [14, [0, 3, 7, 13, 19, 29, 42, 63, 99, 174, 456]], "": [13, [0, 5, 10, 16, 26, 39, 56, 86, 152, 377]] },
+  Necromancer: { "": [13, [0, 5, 10, 16, 26, 39, 56, 86, 152, 377]] },
+  Paladin:     { "spear or staff": [13, [0, 3, 7, 13, 20, 32, 48, 75, 129, 280]], "": [9, [0, 7, 15, 27, 48, 86, 200]] },
+  Sorceress:   { "": [15, [0, 5, 9, 14, 20, 30, 42, 60, 86, 142, 280]] },
+};
+const MERC_FHR = {
+  a1: [11, [0, 6, 13, 20, 32, 52, 86, 174]],
+  a2: [15, [0, 5, 9, 14, 20, 30, 42, 60, 86, 142]],
+  a3: [17, [0, 5, 8, 13, 18, 24, 32, 46, 63, 86, 133, 232]],
+  a5: [9, [0, 7, 15, 27, 48, 86, 200]],
+};
+// Normal attack (A1) animation: [frames per direction, starting frame] by weapon animation class.
+// Animation speed is 256 except Assassin claws (208). Source: The Amazon Basin wiki, Attack speed.
+const ATTACK_ANIM = {
+  Amazon:      { hth: [13, 1], "1hs": [16, 2], "2hs": [20, 2], "1ht": [15, 2], "2ht": [18, 2], stf: [20, 2], bow: [14, 0], xbw: [20, 0] },
+  Assassin:    { hth: [11, 0], "1hs": [15, 0], "2hs": [23, 0], "1ht": [15, 0], "2ht": [23, 0], stf: [19, 0], bow: [16, 0], xbw: [21, 0], ht1: [11, 0, 208], ht2: [11, 0, 208] },
+  Barbarian:   { hth: [12, 0], "1hs": [16, 0], "2hs": [18, 0], "1ht": [16, 0], "2ht": [19, 0], stf: [19, 0], bow: [15, 0], xbw: [20, 0] },
+  Druid:       { hth: [16, 0], "1hs": [19, 0], "2hs": [21, 0], "1ht": [19, 0], "2ht": [23, 0], stf: [17, 0], bow: [16, 0], xbw: [20, 0] },
+  Necromancer: { hth: [15, 0], "1hs": [19, 0], "2hs": [23, 0], "1ht": [19, 0], "2ht": [24, 0], stf: [20, 0], bow: [18, 0], xbw: [20, 0] },
+  Paladin:     { hth: [14, 0], "1hs": [15, 0], "2hs": [18, 0], "1ht": [17, 0], "2ht": [20, 0], stf: [18, 0], bow: [16, 0], xbw: [20, 0] },
+  Sorceress:   { hth: [16, 1], "1hs": [20, 2], "2hs": [24, 2], "1ht": [19, 2], "2ht": [23, 2], stf: [18, 2], bow: [17, 0], xbw: [20, 0] },
+};
+
 // Slot layout. listSlot = which item list a slot draws from.
 const GEAR_SLOTS = [
   { key: "helm", label: "Helm", list: "helm" },

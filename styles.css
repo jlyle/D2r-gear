@@ -373,3 +373,8 @@ input.qn:focus { outline: none; border-color: var(--accent); background: rgba(12
 .merc-head { margin-bottom: 12px; }
 .merc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0 8px; }
 .merc-sum .res-tile .rt-val { color: var(--text, inherit); }
+
+/* Breakpoint panels */
+.stat-big .frames { font: 500 13px Inter, sans-serif; color: var(--muted); margin-left: 6px; }
+.bps span small { opacity: .7; margin-left: 2px; }
+.ias-ctl { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin-top: 10px; }
