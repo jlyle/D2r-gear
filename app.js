@@ -863,6 +863,23 @@
     }
     return out;
   }
+  // Produce one rune of rank i from t.pool by cubing lower runes; records steps and gems in t.
+  function cubeOne(i, t) {
+    if (i <= 0) return false;
+    const rec = runeRecipe(i - 1);
+    for (let k = 0; k < rec.qty; k++) {
+      if ((t.pool[rec.from] || 0) > 0) t.pool[rec.from]--;
+      else if (!cubeOne(i - 1, t)) return false;
+    }
+    t.steps[i - 1] = (t.steps[i - 1] || 0) + 1;
+    if (rec.gem) t.gems[rec.gem] = (t.gems[rec.gem] || 0) + 1;
+    return true;
+  }
+  // Most runes of rank i you could end up with, cubing everything below it upward (gems ignored).
+  function maxMakeable(have, i) {
+    let carry = 0;
+    for (let k = 0; ; k++) { const n = (have[RUNE_ORDER[k]] || 0) + carry; if (k === i) return n; carry = Math.floor(n / runeRecipe(k).qty); }
+  }
   // Plan one runeword: use runes you hold first, then cube missing ones up from
   // lower runes (not counting runes the recipe itself needs). Gems are listed, not required.
   function planRuneword(g, have, gems) {
@@ -873,17 +890,7 @@
     short.sort((a, b) => runeRank(a) - runeRank(b));
     let steps = {}, gemNeed = {};
     const toFind = [], cubed = [];
-    const makeOne = (i, t) => { // produce one rune of rank i from t.pool
-      if (i <= 0) return false;
-      const rec = runeRecipe(i - 1);
-      for (let k = 0; k < rec.qty; k++) {
-        if ((t.pool[rec.from] || 0) > 0) t.pool[rec.from]--;
-        else if (!makeOne(i - 1, t)) return false;
-      }
-      t.steps[i - 1] = (t.steps[i - 1] || 0) + 1;
-      if (rec.gem) t.gems[rec.gem] = (t.gems[rec.gem] || 0) + 1;
-      return true;
-    };
+    const makeOne = cubeOne;
     let cur = { pool, steps, gems: gemNeed };
     for (const r of short) {
       const t = { pool: { ...cur.pool }, steps: { ...cur.steps }, gems: { ...cur.gems } };
@@ -1041,11 +1048,45 @@
         <div class="gg-h" role="row"><span></span>${GEM_GRADES.map((g) => `<span role="columnheader">${gradeLabel(g)}</span>`).join("")}</div>
         ${GEM_TYPES.filter((t) => GEM_GRADES.some((g) => gems[gemName(g, t)])).map((t) => `<div class="gg-r" role="row"><span class="gem-name gem-${t.toLowerCase()}" role="rowheader">${t}</span>${GEM_GRADES.map((g) => { const n = gems[gemName(g, t)] || 0; return `<span class="${n ? "n" : "z"}" role="cell">${n || "·"}</span>`; }).join("")}</div>`).join("")}
       </div>` : `<p class="notes">No gems in your stash yet. Add them on the Stash tab (Gear type: Gem).</p>`;
+    // ---- Rune upgrade checker: can I cube up to a target rune? ----
+    const tRune = RUNE_ORDER.includes(c.runeTarget) ? c.runeTarget : "Ist";
+    const tWant = Math.min(5, Math.max(1, Number(c.runeTargetQty) || 1));
+    const ti = runeRank(tRune);
+    const held = runes[tRune] || 0;
+    const t = { pool: { ...runes }, steps: {}, gems: {} };
+    const usedHeld = Math.min(held, tWant);
+    t.pool[tRune] = held - usedHeld;
+    let made = 0;
+    for (let k = usedHeld; k < tWant; k++) { const tr = { pool: { ...t.pool }, steps: { ...t.steps }, gems: { ...t.gems } }; if (!cubeOne(ti, tr)) break; Object.assign(t, tr); made++; }
+    const short = tWant - usedHeld - made;
+    const maxN = maxMakeable(runes, ti);
+    const steps = Object.entries(t.steps).map(([i, times]) => ({ ...runeRecipe(+i), times })).sort((a, b) => runeRank(a.from) - runeRank(b.from));
+    const gemNeed = Object.entries(t.gems).map(([gem, n]) => ({ gem, n, have: gems[gem] || 0 }));
+    const gemShort = gemNeed.filter((x) => x.have < x.n);
+    const below = ti > 0 ? runeRecipe(ti - 1) : null;
+    const status = !short && !made ? `<span class="rw-qty">In your stash</span>`
+      : !short ? `<span class="rw-qty">${gemShort.length ? "Can cube — gems short" : "Can cube it"}</span>`
+      : `<span class="badge">${short} short</span>`;
+    const checker = `<div class="card rune-check" style="margin-top:12px">
+        <h3>Rune upgrade checker</h3>
+        <div class="rc-pick">
+          <div class="field"><label for="rcRune">Rune you want</label><select id="rcRune">${RUNE_ORDER.map((r) => `<option ${r === tRune ? "selected" : ""}>${r}</option>`).join("")}</select></div>
+          <div class="field"><label for="rcQty">How many</label><select id="rcQty">${[1, 2, 3, 4, 5].map((n) => `<option ${n === tWant ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+        </div>
+        <div class="rw-head" style="margin-top:10px">${runeChip(tRune, "out")}${tWant > 1 ? `<span class="notes">× ${tWant}</span>` : ""}${status}</div>
+        <p class="notes rw-sum">In your stash: ${held}${made ? ` · Cube up: ${made}` : ""}${short ? ` · Still short: ${short}` : ""} · Most you could have by cubing everything below: ${maxN}</p>
+        ${steps.length ? `<h4 class="rw-sub">Cube steps, in order</h4>${steps.map((r) => `<div class="cube-row"><div class="cube-recipe">${r.qty} × ${runeChip(r.from)}${r.gem ? ` + ${gemChip(r.gem, (gems[r.gem] || 0) ? "have" : "need")}` : ""} <span class="arrow">→</span> ${runeChip(r.to, "out")}</div><div class="cube-meta">${r.times > 1 ? `<span class="rw-qty">×${r.times}</span>` : ""}</div></div>`).join("")}` : ""}
+        ${gemNeed.length ? `<h4 class="rw-sub">Gems for cubing</h4><div class="rw-runes">${gemNeed.map((x) => `${gemChip(x.gem, x.have >= x.n ? "have" : "need")}<span class="notes">${x.have} of ${x.n}</span>`).join(" ")}</div>
+          ${gemShort.length ? `<p class="notes">Short on gems: ${gemShort.map((x) => `${x.n - x.have} ${esc(x.gem)}`).join(", ")}. 3 of a grade make the next grade (see Gem upgrades below).</p>` : ""}` : ""}
+        ${short ? `<p class="notes">${below ? `Each ${esc(tRune)} takes ${below.qty} ${esc(below.from)}${below.gem ? ` + ${esc(below.gem)}` : ""}; you have ${runes[below.from] || 0} ${esc(below.from)} and not enough lower runes to make the rest.` : "El is the lowest rune — it can't be cubed."}</p>
+          <div class="notes rw-miss">Trade: <a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(tRune + " Rune")}" target="_blank" rel="noopener">${esc(tRune)} ↗</a>${below ? ` <a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(below.from + " Rune")}" target="_blank" rel="noopener">${esc(below.from)} ↗</a>` : ""}</div>` : ""}
+      </div>`;
     body.innerHTML = `
       <div class="card">
         <h3>Gems in your stash</h3>
         ${gemGrid}
       </div>
+      ${checker}
       <div class="card" style="margin-top:12px">
         <h3>Rune upgrades you can cube now (${now.length})</h3>
         <p class="notes" style="margin-top:4px">From the runes and gems in your stash. Best result first. Each recipe is counted on its own, so two recipes can be counting the same gem.</p>
@@ -1064,6 +1105,9 @@
         <summary>All rune recipes</summary>
         ${RUNE_ORDER.slice(0, -1).map((_, i) => { const r = runeRecipe(i); return `<div class="cube-ref-row">${r.qty} ${esc(r.from)}${r.gem ? ` + ${esc(r.gem)}` : ""} → <b>${esc(r.to)}</b></div>`; }).join("")}
       </details>`;
+    const rcSet = () => { c.runeTarget = body.querySelector("#rcRune").value; c.runeTargetQty = Number(body.querySelector("#rcQty").value) || 1; save(); render(); };
+    body.querySelector("#rcRune").onchange = rcSet;
+    body.querySelector("#rcQty").onchange = rcSet;
   }
 
   function renderStash(body, c) {

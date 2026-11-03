@@ -344,3 +344,7 @@ input.qn:focus { outline: none; border-color: var(--accent); background: rgba(12
 .rw-plan-btn { margin-left: auto; }
 .rw-sum { margin-top: 6px; }
 .rw-sub { font: 600 13px Inter, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 2px; }
+
+/* Rune upgrade checker */
+.rc-pick { display: grid; grid-template-columns: 1fr 96px; gap: 10px; margin-top: 6px; }
+.rune-check .rw-head .badge, .rune-check .rw-head .rw-qty { margin-left: 4px; }
