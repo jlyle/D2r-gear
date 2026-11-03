@@ -77,7 +77,7 @@ Each recipe is counted on its own, so two recipes that need the same gem can bot
 ### Exporting
 - **Step 1:** Unlock the account.
 - **Step 2:** Open the **⋯** menu and tap **Export account backup**.
-- **Step 3:** A **Save** window opens so you can pick the folder and file name (Downloads, Google Drive, an SD card…). The suggested name looks like `perfect-roll-Ladder-2026-11-03-v1.4.1.json`: account, date, then the app version that made it. In the **Android app** this is Android's own files window. In a browser on a computer, Chrome and Edge show a Save-as window; other browsers save straight to Downloads (or ask where, if you've set the browser to).
+- **Step 3:** A **Save** window opens so you can pick the folder and file name (Downloads, Google Drive, an SD card…). The suggested name looks like `perfect-roll-Ladder-2026-11-03-v1.4.2.json`: account, date, then the app version that made it. In the **Android app** this is Android's own files window. In a browser on a computer, Chrome and Edge show a Save-as window; other browsers save straight to Downloads (or ask where, if you've set the browser to).
 - **Step 4:** Keep it somewhere off the device: Google Drive, OneDrive, email, a USB stick. Its name includes the date and app version, so you can keep several and know which is newest.
 
 ### Restoring
