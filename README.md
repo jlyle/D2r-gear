@@ -18,7 +18,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 - Add gear from photos: snap item tooltips, on-device OCR (Tesseract.js) matches the item, pre-picks the slot and fills in your rolls
 - Photos are only used to read stats and are never stored; items show original gear-type icons tinted by rarity
 - Tooltip-style item display: typical stats, a divider, then the item's actual stats; per-item Scan stats from a photo
-- Runewords tab: what you can make from the runes in your stash, what you're one or two runes away from, and Traderie links for the missing ones
+- Runewords tab: what you can make from the runes in your stash, what you're one or two runes away from, a planner for any runeword with the cube steps to get there, and Traderie links for the missing ones
 - Gems & Cube tab: gem inventory by grade, Horadric Cube rune and gem upgrades you can do right now
 - Skills tab: suggested skill point order and amounts plus stat points for all 40 builds
 - Upgrades tab: stash upgrades first, then per-slot suggestions with Traderie links, FCR breakpoint check for caster builds, missing charms
@@ -51,6 +51,7 @@ Runes live in the shared stash like any other item, so every character on the ac
 - **Almost there** — runewords missing one or two runes where you already own at least half the recipe. Each missing rune links to a Traderie search.
 - Each card shows the rune order, allowed bases, required level, and the runeword's stats.
 - Filter to **All runewords** or **Only** your current build's.
+- **Plan a runeword** — type any runeword (nicknames like HotO or CtA work) or tap **Plan** on a card. It shows which runes you hold, the Horadric Cube steps to make missing runes from lower ones in your stash (lowest first, with the gems each step needs and how many you have), and anything still to find, with Traderie links. Runes the recipe itself uses are never cubed away. The plan is saved per character.
 
 **Gems & Cube tab** — Horadric Cube upgrades from your stash:
 - **Rune upgrades you can cube now** — El through Ort take 3 runes; Thul through Lem take 3 runes plus a gem; Pul and up take 2 runes plus a gem. The required gem follows the game's recipe table (Topaz, Amethyst, Sapphire, Ruby, Emerald, Diamond, stepping up a grade every six runes).

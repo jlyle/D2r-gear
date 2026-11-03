@@ -863,6 +863,36 @@
     }
     return out;
   }
+  // Plan one runeword: use runes you hold first, then cube missing ones up from
+  // lower runes (not counting runes the recipe itself needs). Gems are listed, not required.
+  function planRuneword(g, have, gems) {
+    const pool = { ...have };
+    const need = {}; g.runes.forEach((r) => (need[r] = (need[r] || 0) + 1));
+    const short = [];
+    for (const [r, n] of Object.entries(need)) { const use = Math.min(pool[r] || 0, n); pool[r] = (pool[r] || 0) - use; for (let k = use; k < n; k++) short.push(r); }
+    short.sort((a, b) => runeRank(a) - runeRank(b));
+    let steps = {}, gemNeed = {};
+    const toFind = [], cubed = [];
+    const makeOne = (i, t) => { // produce one rune of rank i from t.pool
+      if (i <= 0) return false;
+      const rec = runeRecipe(i - 1);
+      for (let k = 0; k < rec.qty; k++) {
+        if ((t.pool[rec.from] || 0) > 0) t.pool[rec.from]--;
+        else if (!makeOne(i - 1, t)) return false;
+      }
+      t.steps[i - 1] = (t.steps[i - 1] || 0) + 1;
+      if (rec.gem) t.gems[rec.gem] = (t.gems[rec.gem] || 0) + 1;
+      return true;
+    };
+    let cur = { pool, steps, gems: gemNeed };
+    for (const r of short) {
+      const t = { pool: { ...cur.pool }, steps: { ...cur.steps }, gems: { ...cur.gems } };
+      if (makeOne(runeRank(r), t)) { cur = t; cubed.push(r); } else toFind.push(r);
+    }
+    const stepList = Object.entries(cur.steps).map(([i, times]) => ({ ...runeRecipe(+i), times })).sort((a, b) => runeRank(a.from) - runeRank(b.from));
+    const gemList = Object.entries(cur.gems).map(([gem, n]) => ({ gem, n, have: gems[gem] || 0 }));
+    return { held: g.runes.length - short.length, cubed, toFind, steps: stepList, gems: gemList, gemsShort: gemList.filter((x) => x.have < x.n) };
+  }
   function renderRunewords(body, c) {
     const have = stashRunes();
     const total = Object.values(have).reduce((a, b) => a + b, 0);
@@ -875,15 +905,50 @@
     const close = all.filter((g) => g.missing.length && g.missing.length <= 2 && g.owned >= Math.ceil(g.runes.length / 2))
       .sort((x, y) => x.missing.length - y.missing.length || (inBuild.has(y.name) - inBuild.has(x.name)) || x.hardest - y.hardest);
     const chip = (r, ok) => `<span class="rune-chip ${ok ? "have" : "need"}">${esc(r)}</span>`;
+    const gemChip = (gm, cls) => `<span class="gem-chip ${cls} gem-${(gm.split(" ").pop() || "").toLowerCase()}">${esc(gm)}</span>`;
+    const trLink = (r) => `<a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(r + " Rune")}" target="_blank" rel="noopener">${esc(r)} ↗</a>`;
+    const everyRw = runewordStatus(have);
+    const rwByName = new Map(everyRw.map((g) => [g.name.toLowerCase(), g]));
+    for (const g of everyRw) for (const it of g.items) if (it.alias) rwByName.set(String(it.alias).toLowerCase(), g);
+    const target = c.rwTarget ? rwByName.get(c.rwTarget.toLowerCase()) : null;
+    const planCard = (() => {
+      const picker = `<div class="field rw-pick"><label for="rwTarget">Runeword to plan</label>
+          <div class="rw-pick-row"><input type="search" id="rwTarget" list="rwNames" placeholder="Type a name, e.g. Enigma or HotO" value="${esc(target ? target.name : "")}" autocomplete="off">
+          ${target ? `<button class="btn small ghost" id="rwClear">Clear</button>` : ""}</div>
+          <datalist id="rwNames">${everyRw.map((g) => g.name).sort().map((n) => `<option value="${esc(n)}">`).join("")}</datalist></div>`;
+      if (!target) return `<div class="card rw-plan" style="margin-top:12px"><h3>Plan a runeword</h3>${picker}<p class="notes">Pick any runeword to see which runes you hold, which you can cube up from lower runes in your stash, and what's left to find or trade for. You can also tap <b>Plan</b> on any card below.</p></div>`;
+      const p = planRuneword(target, have, stashCounts("gem"));
+      const it = target.items[0];
+      const used = {};
+      const chips = target.runes.map((r) => { used[r] = (used[r] || 0) + 1; return chip(r, used[r] <= (have[r] || 0)); }).join("");
+      const status = !p.cubed.length && !p.toFind.length ? `<span class="rw-qty">Ready to make</span>`
+        : !p.toFind.length ? `<span class="rw-qty">${p.gemsShort.length ? "Ready after cubing — gems short" : "Ready after cubing"}</span>`
+        : `<span class="badge">${p.toFind.length} rune${p.toFind.length === 1 ? "" : "s"} to find</span>`;
+      return `<div class="card rw-plan" style="margin-top:12px">
+        <h3>Plan a runeword</h3>${picker}
+        <div class="rw-card">
+          <div class="rw-head"><span class="n-runeword rw-name">${esc(target.name)}</span>${status}${inBuild.has(target.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}</div>
+          <div class="rw-runes">${chips}</div>
+          <div class="notes">${esc([...target.bases].join(" · ") || "")}${target.req ? ` · lvl ${target.req}` : ""}</div>
+          <p class="notes rw-sum">In your stash: ${p.held} of ${target.runes.length}${p.cubed.length ? ` · Cube up: ${p.cubed.map(esc).join(", ")}` : ""}${p.toFind.length ? ` · Still to find: ${p.toFind.map(esc).join(", ")}` : ""}</p>
+          ${p.steps.length ? `<h4 class="rw-sub">Cube steps, in order</h4>
+            ${p.steps.map((r) => `<div class="cube-row"><div class="cube-recipe">${r.qty} × ${chip(r.from, true)}${r.gem ? ` + ${gemChip(r.gem, (stashCounts("gem")[r.gem] || 0) ? "have" : "need")}` : ""} <span class="arrow">→</span> <span class="rune-chip out">${esc(r.to)}</span></div><div class="cube-meta">${r.times > 1 ? `<span class="rw-qty">×${r.times}</span>` : ""}</div></div>`).join("")}` : ""}
+          ${p.gems.length ? `<h4 class="rw-sub">Gems for cubing</h4><div class="rw-runes">${p.gems.map((x) => `${gemChip(x.gem, x.have >= x.n ? "have" : "need")}<span class="notes">${x.have} of ${x.n}</span>`).join(" ")}</div>
+            ${p.gemsShort.length ? `<p class="notes">Short on gems: ${p.gemsShort.map((x) => `${x.n - x.have} ${esc(x.gem)}`).join(", ")}. 3 of a grade cube into the next grade (Gems &amp; Cube tab).</p>` : ""}` : ""}
+          ${p.toFind.length ? `<div class="notes rw-miss">Find or trade: ${p.toFind.map(trLink).join(" ")}</div><p class="notes">Not enough lower runes to cube ${p.toFind.length === 1 ? "this one" : "these"} up.</p>` : ""}
+          <details class="rw-stats"><summary>Stats</summary><ul class="tip-stats">${statLines(it.stats).map((l) => `<li>${esc(l)}</li>`).join("")}</ul></details>
+        </div>
+      </div>`;
+    })();
     const card = (g) => {
       const it = g.items[0];
       const used = {}; // mark which of the recipe's runes you already hold
       const chips = g.runes.map((r) => { used[r] = (used[r] || 0) + 1; return chip(r, used[r] <= (have[r] || 0)); }).join("");
       return `<div class="rw-card">
-        <div class="rw-head"><span class="n-runeword rw-name">${esc(g.name)}</span>${g.qty ? `<span class="rw-qty" title="How many you can make from your stash runes">×${g.qty} <small>can make</small></span>` : ""}${inBuild.has(g.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}</div>
+        <div class="rw-head"><span class="n-runeword rw-name">${esc(g.name)}</span>${g.qty ? `<span class="rw-qty" title="How many you can make from your stash runes">×${g.qty} <small>can make</small></span>` : ""}${inBuild.has(g.name) ? `<span class="badge t2">★ ${esc(b.name)}</span>` : ""}<button class="btn small ghost rw-plan-btn" data-plan="${esc(g.name)}">Plan</button></div>
         <div class="rw-runes">${chips}</div>
         <div class="notes">${esc([...g.bases].join(" · ") || "")}${g.req ? ` · lvl ${g.req}` : ""}</div>
-        ${g.missing.length ? `<div class="notes rw-miss">Need: ${g.missing.map((r) => `<a class="ext" href="https://traderie.com/diablo2resurrected/products?search=${encodeURIComponent(r + " Rune")}" target="_blank" rel="noopener">${esc(r)} ↗</a>`).join(" ")}</div>` : ""}
+        ${g.missing.length ? `<div class="notes rw-miss">Need: ${g.missing.map(trLink).join(" ")}</div>` : ""}
         <details class="rw-stats"><summary>Stats</summary><ul class="tip-stats">${statLines(it.stats).map((l) => `<li>${esc(l)}</li>`).join("")}</ul></details>
       </div>`;
     };
@@ -898,6 +963,7 @@
           <button class="btn small ${rwFilter === "build" ? "" : "ghost"}" data-rwf="build" ${b ? "" : "disabled"}>${b ? `Only ${esc(b.name)}` : "No build picked"}</button>
         </div>
       </div>
+      ${planCard}
       <div class="card" style="margin-top:12px">
         <h3>Ready to make (${ready.length})</h3>
         ${ready.length ? ready.map(card).join("") : `<p class="notes">${total ? "Nothing complete yet — see what you're close to below." : "Add runes to see what you can make."}</p>`}
@@ -908,6 +974,14 @@
         ${close.length ? close.map(card).join("") : `<p class="notes">Nothing within two runes yet.</p>`}
       </div>`;
     body.querySelectorAll("[data-rwf]").forEach((btn) => (btn.onclick = () => { rwFilter = btn.dataset.rwf; render(); }));
+    const setTarget = (name) => { if (name) c.rwTarget = name; else delete c.rwTarget; save(); render(); };
+    const inp = body.querySelector("#rwTarget");
+    const pick = () => { const g = rwByName.get(inp.value.trim().toLowerCase()); if (g && g !== target) setTarget(g.name); };
+    inp.addEventListener("change", pick);
+    inp.addEventListener("input", () => { if (rwByName.has(inp.value.trim().toLowerCase())) pick(); });
+    inp.addEventListener("keydown", (e) => { if (e.key === "Enter") pick(); });
+    body.querySelector("#rwClear")?.addEventListener("click", () => setTarget(null));
+    body.querySelectorAll("[data-plan]").forEach((btn) => (btn.onclick = () => { setTarget(btn.dataset.plan); body.querySelector(".rw-plan")?.scrollIntoView({ behavior: "smooth", block: "start" }); }));
   }
 
   // ---------- gems & Horadric Cube upgrades ----------

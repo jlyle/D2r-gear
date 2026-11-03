@@ -335,3 +335,12 @@ input.qn:focus { outline: none; border-color: var(--accent); background: rgba(12
 .cube-ref-row { font-size: 14px; padding: 3px 0; color: var(--muted); } .cube-ref-row b { color: var(--text); }
 .cube-meta { font-size: 14px; color: var(--muted); }
 
+
+/* Runeword planner */
+.rw-pick { margin: 6px 0 4px; }
+.rw-pick-row { display: flex; gap: 8px; align-items: center; }
+.rw-pick-row input { flex: 1; min-width: 0; }
+.rw-plan .rw-card { border-top: 1px solid var(--line); margin-top: 10px; }
+.rw-plan-btn { margin-left: auto; }
+.rw-sum { margin-top: 6px; }
+.rw-sub { font: 600 13px Inter, sans-serif; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 12px 0 2px; }
