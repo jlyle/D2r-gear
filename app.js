@@ -1971,7 +1971,7 @@
     await saveChain;
     const { name, salt, iv, data } = session.acct;
     const blob = new Blob([JSON.stringify({ format: "gear-ledger-account", v: 2, name, salt, iv, data })], { type: "application/json" });
-    const fileName = `perfect-roll-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}.json`;
+    const fileName = `perfect-roll-${name.replace(/[^\w-]+/g, "_")}-${new Date().toISOString().slice(0, 10)}-v${APP_VERSION}.json`;
     // Browsers that can show a "Save as" window (Chrome/Edge on a computer) let you pick the folder.
     if (window.showSaveFilePicker) {
       try {

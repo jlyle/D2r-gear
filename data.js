@@ -8,6 +8,9 @@
 
 const CLASSES = ["Amazon", "Assassin", "Barbarian", "Druid", "Necromancer", "Paladin", "Sorceress", "Warlock"];
 
+// App version: goes into backup file names. Keep in step with "version" in the Android app's package.json.
+const APP_VERSION = "1.4.1";
+
 const ITEMS = [
   // ---------- HELMS ----------
   { name: "Tarnhelm", type: "unique", slot: "helm", req: 15, stats: "+1 all skills, 25-50% MF, 75% extra gold" },
