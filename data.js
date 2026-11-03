@@ -3,7 +3,7 @@
 // type: unique | set | runeword | rare | charm
 // slot: helm | amulet | ring | weapon | offhand | armor | gloves | belt | boots | charm
 // fcr: fixed (or minimum-roll) Faster Cast Rate the item contributes
-// cls: class restriction · merc: usable by Act 2 mercenary as weapon
+// cls: class restriction · merc: usable by Act 2 mercenary as weapon (merc weapons are also matched by base type in app.js)
 // size: inventory cells for charms
 
 const CLASSES = ["Amazon", "Assassin", "Barbarian", "Druid", "Necromancer", "Paladin", "Sorceress", "Warlock"];
@@ -345,6 +345,21 @@ const MERC_SLOTS = [
   { key: "merc_helm", label: "Merc helm", list: "helm" },
   { key: "merc_armor", label: "Merc armor", list: "armor" },
 ];
+
+// Mercenary types. weapons: which weapon kinds each can wield (see weaponKinds in app.js).
+// Act 2 auras: the first three can be hired in Normal, all six in Nightmare and Hell.
+const MERC_TYPES = [
+  { key: "a1", label: "Act 1 Rogue Scout", short: "Act 1", weapons: ["bow"], weaponText: "bows", variants: ["Fire", "Cold"] },
+  { key: "a2", label: "Act 2 Desert Mercenary", short: "Act 2", weapons: ["polearm", "spear", "javelin"], weaponText: "polearms, spears and javelins", variants: ["Prayer", "Defiance", "Blessed Aim", "Thorns", "Holy Freeze", "Might"], variantNote: "Prayer, Defiance and Blessed Aim can be hired in Normal; all six in Nightmare and Hell." },
+  { key: "a3", label: "Act 3 Iron Wolf", short: "Act 3", weapons: ["sword1h"], weaponText: "one-handed swords, plus a shield", variants: ["Fire", "Cold", "Lightning"] },
+  { key: "a5", label: "Act 5 Barbarian", short: "Act 5", weapons: ["sword"], weaponText: "swords (two with Frenzy)", variants: ["Bash", "Frenzy"] },
+];
+// Weapon (and Act 3 shield) suggestions for mercs other than Act 2; Act 2 uses each build's own lists.
+const MERC_RECS = {
+  a1: { merc_weapon: [["Raven Claw", "Edge"], ["Harmony", "Lycander's Aim"], ["Faith", "Ice", "Windforce"]] },
+  a3: { merc_weapon: [["Spirit (sword)"], ["Spirit (sword)"], ["Spirit (sword)"]], merc_offhand: [["Ancient's Pledge", "Spirit (shield)"], ["Spirit (shield)"], ["Spirit (shield)"]] },
+  a5: { merc_weapon: [["Steel"], ["Kingslayer", "Lawbringer"], ["Grief", "Breath of the Dying"]], merc_weapon2: [["Steel"], ["Kingslayer", "Lawbringer"], ["Grief", "Breath of the Dying"]] },
+};
 
 // Shared tier lists. Each slot: [starter, mid, endgame] arrays of item names.
 const CASTER_COMMON = {

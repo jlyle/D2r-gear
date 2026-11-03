@@ -245,9 +245,57 @@
   // ---------- tiers & recommendations ----------
   const listKey = (slotKey) => (slotKey === "ring1" || slotKey === "ring2" ? "ring" : slotKey);
 
-  function tierOf(build, slotKey, itemName) {
+  // ---------- mercenary type, slots and what it can use ----------
+  const mercType = (c) => MERC_TYPES.find((t) => t.key === c?.merc?.type) || MERC_TYPES[1];
+  function mercSlots(c) {
+    const t = mercType(c);
+    const out = [{ key: "merc_weapon", label: "Merc weapon", list: "weapon", mercOnly: true }];
+    if (t.key === "a5" && c.merc?.variant === "Frenzy") out.push({ key: "merc_weapon2", label: "Merc 2nd weapon", list: "weapon", mercOnly: true });
+    if (t.key === "a3") out.push({ key: "merc_offhand", label: "Merc shield", list: "offhand" });
+    out.push({ key: "merc_helm", label: "Merc helm", list: "helm" }, { key: "merc_armor", label: "Merc armor", list: "armor" });
+    return out;
+  }
+  const TWO_HAND_SWORDS = /two-handed sword|claymore|giant sword|bastard sword|flamberge|great sword|espandon|dacian falx|tusk sword|gothic sword|zweihander|executioner sword|legend sword|highland blade|balrog blade|champion sword|colossus (?:sword|blade)/i;
+  // Weapon kinds an item counts as, from its game base type, runeword bases, name or stats prefix.
+  function weaponKinds(it) {
+    const k = new Set();
+    const bt = it.btype || "";
+    if (bt === "bow" || bt === "abow") k.add("bow");
+    if (bt === "swor") { k.add("sword"); if (!TWO_HAND_SWORDS.test(it.base || "")) k.add("sword1h"); }
+    if (bt === "pole") k.add("polearm");
+    if (bt === "spea" || bt === "aspe") k.add("spear");
+    if (bt === "jave" || bt === "ajav") k.add("javelin");
+    if (!bt) {
+      const txt = `${it.bases || ""} ${(/^\s*(\w+):/.exec(it.stats || "") || [])[1] || ""} ${(/\((sword|weapon)\)/.exec(it.name) || [])[1] || ""}`.toLowerCase();
+      if (/\bbows?\b|missile/.test(txt)) k.add("bow");
+      if (/swords?\b/.test(txt)) { k.add("sword"); k.add("sword1h"); }
+      if (/polearms?\b/.test(txt)) k.add("polearm");
+      if (/spears?\b/.test(txt)) k.add("spear");
+      if (/javelins?\b/.test(txt)) k.add("javelin");
+      if (/(^|[\s-])weapons?\b|melee weapons|\(weapon\)/.test(txt)) ["bow", "sword", "sword1h", "polearm", "spear", "javelin"].forEach((x) => k.add(x));
+      if (!k.size && it.merc) { k.add("polearm"); k.add("spear"); }
+    }
+    return k;
+  }
+  function mercItemOk(c, slot, it) {
+    const t = mercType(c);
+    const kinds = it.slot === "weapon" ? weaponKinds(it) : null;
+    if (it.cls && !(t.key === "a1" && kinds?.has("bow"))) return false; // mercs can't use class items (Act 1 can use Amazon bows)
+    if (slot.mercOnly) return t.weapons.some((w) => kinds.has(w));
+    if (slot.key === "merc_offhand") return !it.btype || it.btype === "shie";
+    return true;
+  }
+  const lvlFor = (c, key) => Number(String(key || "").startsWith("merc") ? c.merc?.level : c.level) || 0;
+  const fitsSlot = (it, c, key) => { const L = lvlFor(c, key); return !L || !it.req || it.req <= L; };
+  // Tier lists for a slot: merc types other than Act 2 have their own weapon lists.
+  function tiersFor(build, slotKey, c) {
+    if (c && slotKey.startsWith("merc")) { const o = MERC_RECS[mercType(c).key]?.[slotKey]; if (o) return o; }
+    return build?.tiers[listKey(slotKey)];
+  }
+
+  function tierOf(build, slotKey, itemName, c) {
     if (!build || !itemName) return null;
-    const tiers = build.tiers[listKey(slotKey)];
+    const tiers = tiersFor(build, slotKey, c);
     if (!tiers) return null;
     for (let t = 2; t >= 0; t--) if (tiers[t].includes(itemName)) return t;
     return -1;
@@ -256,11 +304,11 @@
   function recommendations(c, slotKey) {
     const b = buildOf(c);
     if (!b) return { status: "nobuild", items: [] };
-    const tiers = b.tiers[listKey(slotKey)];
+    const tiers = tiersFor(b, slotKey, c);
     if (!tiers) return { status: "none", items: [] };
     const target = Math.min(c.budget, 2);
     const curName = c.gear[slotKey]?.item;
-    const t = curName ? tierOf(b, slotKey, curName) : -2; // -2 empty, -1 off-build
+    const t = curName ? tierOf(b, slotKey, curName, c) : -2; // -2 empty, -1 off-build
     if (t >= target) return { status: "ok", tier: t, items: [] };
     const seen = new Set();
     const items = [];
@@ -268,7 +316,7 @@
       for (const n of tiers[k]) {
         if (n === curName || seen.has(n)) continue;
         const it = byName.get(n);
-        if (!it || !fitsLevel(it, c)) continue;
+        if (!it || !fitsSlot(it, c, slotKey)) continue;
         seen.add(n);
         items.push({ item: it, tier: k });
       }
@@ -354,7 +402,7 @@
 
     const body = $("#tabBody");
     if (tab === "gear") renderSlots(body, c, GEAR_SLOTS);
-    else if (tab === "merc") renderSlots(body, c, MERC_SLOTS);
+    else if (tab === "merc") renderMerc(body, c);
     else if (tab === "charms") renderCharms(body, c);
     else if (tab === "stash") renderStash(body, c);
     else if (tab === "skills") renderSkills(body, c);
@@ -546,14 +594,13 @@
   function itemOptions(c, slot, selected) {
     const b = buildOf(c);
     const dualWield = slot.key === "offhand" && DUAL_WIELD.includes(c.cls);
-    const pool = ITEMS.filter((i) => (i.slot === slot.list || (dualWield && i.slot === "weapon")) &&(!i.cls || i.cls === c.cls || slot.key.startsWith("merc")) && (!slot.mercOnly || i.merc));
-    const mercClsOk = (i) => !(slot.key.startsWith("merc") && i.cls); // mercs can't use class items
-    const usable = pool.filter(mercClsOk);
+    const isMerc = slot.key.startsWith("merc");
+    const usable = ITEMS.filter((i) => (i.slot === slot.list || (dualWield && i.slot === "weapon")) && (isMerc ? mercItemOk(c, slot, i) : !i.cls || i.cls === c.cls));
     const opt = (i) => `<option value="${esc(i.name)}" ${i.name === selected ? "selected" : ""}>${esc(i.name)}${i.alias ? ` (${esc(i.alias)})` : ""} · lvl ${i.req ?? "?"}</option>`;
     let html = `<option value="">— empty —</option>`;
     const recNames = new Set();
-    if (b && b.tiers[listKey(slot.key)]) {
-      const tiers = b.tiers[listKey(slot.key)];
+    if (b && tiersFor(b, slot.key, c)) {
+      const tiers = tiersFor(b, slot.key, c);
       html += `<optgroup label="Recommended for ${esc(b.name)}">`;
       for (let t = 2; t >= 0; t--) for (const n of tiers[t]) {
         if (recNames.has(n)) continue;
@@ -572,9 +619,9 @@
 
   function tierBadge(c, slotKey, name) {
     const b = buildOf(c);
-    if (b && !b.tiers[listKey(slotKey)]) return `<span class="badge">not used by build</span>`;
+    if (b && !tiersFor(b, slotKey, c)) return `<span class="badge">not used by build</span>`;
     if (!name) return `<span class="badge">empty</span>`;
-    const t = tierOf(buildOf(c), slotKey, name);
+    const t = tierOf(buildOf(c), slotKey, name, c);
     if (t === null) return "";
     if (t === -1) return `<span class="badge off">off-build</span>`;
     return `<span class="badge t${t}">${TIER_NAMES[t]}</span>`;
@@ -704,7 +751,7 @@
       const g = c.gear[s.key] || {};
       const it = byName.get(g.item);
       return `<div class="card slot" data-slot="${s.key}">
-        <h3><span>${s.label}</span>${tierBadge(c, s.key, g.item)}</h3>
+        <h3><span>${s.label}</span>${tierBadge(c, s.key, g.item)}${it && !fitsSlot(it, c, s.key) ? `<span class="badge off">needs lvl ${it.req}</span>` : ""}</h3>
         ${searchHTML(`Search ${s.label.toLowerCase()}…`)}
         <select class="pick" aria-label="${s.label}">${itemOptions(c, s, g.item)}</select>
         ${entryHTML(g, it, { noteKey: s.key })}
@@ -725,6 +772,47 @@
       });
     });
     wireEntries(body, (k) => c.gear[k]);
+  }
+
+  function renderMerc(body, c) {
+    const m = c.merc || {};
+    const t = mercType(c);
+    const slots = mercSlots(c);
+    renderSlots(body, c, slots);
+    const variant = t.variants.includes(m.variant) ? m.variant : t.variants[0];
+    const wrong = slots.filter((s) => { const it = byName.get(c.gear[s.key]?.item); return it && !mercItemOk(c, s, it); }).map((s) => byName.get(c.gear[s.key].item).name);
+    body.insertAdjacentHTML("afterbegin", `<div class="card merc-head">
+        <h3>${esc(m.name || "Mercenary")}</h3>
+        <div class="merc-grid">
+          <div class="field"><label for="mType">Type</label><select id="mType">${MERC_TYPES.map((x) => `<option value="${x.key}" ${x.key === t.key ? "selected" : ""}>${esc(x.label)}</option>`).join("")}</select></div>
+          <div class="field"><label for="mVar">${t.key === "a2" ? "Aura" : t.key === "a5" ? "Skills" : "Element"}</label><select id="mVar">${t.variants.map((v) => `<option ${v === variant ? "selected" : ""}>${esc(v)}</option>`).join("")}</select></div>
+          <div class="field"><label for="mLvl">Level</label><input type="number" id="mLvl" min="1" max="99" inputmode="numeric" value="${esc(m.level || "")}" placeholder="—"></div>
+          <div class="field"><label for="mName">Name</label><input type="text" id="mName" maxlength="30" value="${esc(m.name || "")}" placeholder="Optional"></div>
+        </div>
+        <p class="notes">Uses ${esc(t.weaponText)}.${t.variantNote ? ` ${esc(t.variantNote)}` : ""}${m.level ? ` Items above level ${esc(m.level)} are flagged, and suggestions stay at or below it.` : " Set a level to flag items it can't wear yet."}</p>
+        ${wrong.length ? `<p class="err">${wrong.map(esc).join(", ")} can't be used by an ${esc(t.short)} merc. Pick a new item below.</p>` : ""}
+      </div>`);
+    const sum = statSummary(c, slots, false);
+    const resLine = [["fire", "Fire"], ["cold", "Cold"], ["light", "Lightning"], ["poison", "Poison"]].map(([e, n]) => {
+      const v = (sum.totals[e] || 0) + (sum.totals.allres || 0);
+      return `<div class="res-tile res-${e}"><span class="rt-name">${n}</span><span class="rt-val">${v > 0 ? "+" : ""}${v}%</span><span class="rt-cap">from gear${sum.totals["max_" + e] ? ` · +${sum.totals["max_" + e]} max` : ""}</span></div>`;
+    }).join("");
+    const auras = auraList(sum.totals);
+    const typicalCount = sum.sources.filter((x) => !x.actual && Object.keys(x.got).length).length;
+    body.insertAdjacentHTML("beforeend", `<div class="card stat-sum merc-sum" style="margin-top:12px">
+        <h3>Merc stats &amp; resists</h3>
+        <div class="res-grid">${resLine}</div>
+        <p class="notes">Resists from gear only. The merc's own resists rise with its level, and the difficulty penalty applies, so check its stat screen for the final number.</p>
+        <p class="notes">Auras: ${esc(t.key === "a2" ? `${variant} (hired)` : "none hired")}${auras.length ? `, plus from gear: ${auras.map(esc).join(", ")}` : ""}</p>
+        ${otherStatsHTML(sum.totals)}
+        ${typicalCount ? `<p class="notes">${typicalCount} item${typicalCount === 1 ? " has" : "s have"} no actual stats, so ${typicalCount === 1 ? "its" : "their"} lowest typical roll is used.</p>` : ""}
+        <details class="ss-src"><summary>Where it comes from</summary>${sourcesHTML(sum.sources)}</details>
+      </div>`);
+    const setM = (patch) => { c.merc = { ...(c.merc || {}), ...patch }; save(); render(); };
+    $("#mType").onchange = (e) => { const nt = MERC_TYPES.find((x) => x.key === e.target.value); setM({ type: nt.key, variant: nt.variants[0] }); };
+    $("#mVar").onchange = (e) => setM({ variant: e.target.value });
+    $("#mLvl").onchange = (e) => { const v = Math.min(99, Math.max(0, Math.round(Number(e.target.value) || 0))); setM({ level: v || undefined }); };
+    $("#mName").onchange = (e) => setM({ name: e.target.value.trim() || undefined });
   }
 
   function renderCharms(body, c) {
@@ -776,11 +864,11 @@
 
   // Slots on this character (and merc) a given item could go into.
   function slotsFor(c, it) {
-    return [...GEAR_SLOTS, ...MERC_SLOTS].filter((s) => {
+    return [...GEAR_SLOTS, ...mercSlots(c)].filter((s) => {
       const isMerc = s.key.startsWith("merc");
       const listOk = it.slot === s.list || (s.key === "offhand" && DUAL_WIELD.includes(c.cls) && it.slot === "weapon");
       if (!listOk) return false;
-      if (isMerc) return !it.cls && (!s.mercOnly || it.merc);
+      if (isMerc) return mercItemOk(c, s, it);
       return !it.cls || it.cls === c.cls;
     });
   }
@@ -800,11 +888,11 @@
       }
       let best = null;
       for (const s of slotsFor(c, it)) {
-        const t = tierOf(b, s.key, it.name);
+        const t = tierOf(b, s.key, it.name, c);
         if (t === null || t < 0) continue;
         const curName = c.gear[s.key]?.item;
-        const ct = curName ? tierOf(b, s.key, curName) : -2;
-        if (t > ct && fitsLevel(it, c) && (!best || ct < best.ct)) best = { s, t, ct, curName };
+        const ct = curName ? tierOf(b, s.key, curName, c) : -2;
+        if (t > ct && fitsSlot(it, c, s.key) && (!best || ct < best.ct)) best = { s, t, ct, curName };
       }
       if (best) out.push({ entry, it, slotKey: best.s.key, label: best.s.label, tier: best.t, why: best.curName ? `Replaces ${best.curName}` : "Slot is empty" });
     }
@@ -1327,6 +1415,10 @@
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster run/walk|frw)\\b")))) add("frw", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:increased attack speed|ias)\\b")))) add("ias", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:better chance of getting magic items|mf|magic find)\\b")))) add("mf", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:life stolen per hit|ll)\\b")))) add("ll", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:chance of crushing blow|cb)\\b")))) add("cb", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:deadly strike|ds)\\b")))) add("ds", m[1]);
+    if ((m = l.match(/(?:level|lvl)\s*(\d+)(?:\s*-\s*\d+)?\s+([a-z][a-z ]*?)\s+aura/))) out.push(["aura:" + m[2].replace(/\b[a-z]/g, (x) => x.toUpperCase()), Number(m[1])]);
     if ((m = l.match(/damage reduced by (\d+)%/)) || (m = l.match(new RegExp(SUM_N + "%\\s*(?:dr|damage reduction|physical damage reduction)\\b")))) add("dr", m[1]);
     if ((m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?all attributes")))) ["str", "dex", "vit", "enr"].forEach((k) => add(k, m[1]));
     else {
@@ -1337,19 +1429,28 @@
     if ((m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?mana\\b(?!\\s*(?:after|stolen|per|leech|&))")))) add("mana", m[1]);
     return out;
   }
+  const SUM_OTHER = [["skills", "All skills", ""], ["life", "Life", ""], ["mana", "Mana", ""], ["fhr", "FHR", "%"], ["frw", "FRW", "%"], ["ias", "IAS", "%"], ["ll", "Life leech", "%"], ["cb", "Crushing blow", "%"], ["ds", "Deadly strike", "%"], ["mf", "Magic find", "%"], ["dr", "Phys. dmg reduced", "%"], ["str", "Strength", ""], ["dex", "Dexterity", ""], ["vit", "Vitality", ""], ["enr", "Energy", ""]];
+  const SUM_LABEL = { allres: "all res", fire: "fire res", cold: "cold res", light: "light res", poison: "poison res", max_fire: "max fire", max_cold: "max cold", max_light: "max light", max_poison: "max poison", skills: "skills", life: "life", mana: "mana", fhr: "% FHR", frw: "% FRW", ias: "% IAS", mf: "% MF", dr: "% DR", ll: "% LL", cb: "% CB", ds: "% DS", str: "str", dex: "dex", vit: "vit", enr: "energy" };
+  const fmtGot = (k, v) => k.startsWith("aura:") ? `${k.slice(5)} aura lvl ${v}` : `${v > 0 ? "+" : ""}${v}${String(SUM_LABEL[k] || k).startsWith("%") ? "" : " "}${SUM_LABEL[k] || k}`;
+  const auraList = (totals) => Object.keys(totals).filter((k) => k.startsWith("aura:")).map((k) => `${k.slice(5)} (lvl ${totals[k]})`);
+  const otherStatsHTML = (totals) => { const o = SUM_OTHER.filter(([k]) => totals[k]); return o.length ? `<dl class="ss-other">${o.map(([k, l, u]) => `<div><dt>${l}</dt><dd>${totals[k] > 0 ? "+" : ""}${totals[k]}${u}</dd></div>`).join("")}</dl>` : ""; };
+  const sourcesHTML = (sources) => `<ul>${sources.filter((x) => Object.keys(x.got).length).map((x) => `<li><b>${esc(x.label)}</b> ${esc(x.it.name)}${x.actual ? "" : ` <span class="badge">typical</span>`}<div class="notes">${Object.entries(x.got).map(([k, v]) => esc(fmtGot(k, v))).join(" · ")}</div></li>`).join("") || `<li class="notes">No stats found on worn gear yet.</li>`}</ul>`;
   const RES_PENALTY = { Normal: 0, Nightmare: 40, Hell: 100 };
-  function statSummary(c) {
+  function statSummary(c, slots = GEAR_SLOTS.filter((s) => s.key !== "swap"), withCharms = true) {
     const totals = {}, sources = [];
     const take = (label, entry) => {
       const it = byName.get(entry?.item); if (!it) return;
       const mine = noteLines(entry.note);
       const lines = mine.length ? mine : statLines(it.stats);
       const got = {};
-      for (const ln of lines) for (const [k, v] of parseStatLine(ln)) { got[k] = (got[k] || 0) + v; totals[k] = (totals[k] || 0) + v; }
+      for (const ln of lines) for (const [k, v] of parseStatLine(ln)) {
+        if (k.startsWith("aura:")) { got[k] = Math.max(got[k] || 0, v); totals[k] = Math.max(totals[k] || 0, v); continue; }
+        got[k] = (got[k] || 0) + v; totals[k] = (totals[k] || 0) + v;
+      }
       sources.push({ label, it, actual: !!mine.length, got });
     };
-    for (const s of GEAR_SLOTS) if (s.key !== "swap") take(s.label, c.gear[s.key]);
-    for (const ch of c.charms) take("Charm", ch);
+    for (const s of slots) take(s.label, c.gear[s.key]);
+    if (withCharms) for (const ch of c.charms) take("Charm", ch);
     const diff = RES_PENALTY[c.resDiff] !== undefined ? c.resDiff : "Hell";
     const anya = c.anya === undefined ? 3 : Math.min(3, Math.max(0, Number(c.anya) || 0));
     const res = ["fire", "cold", "light", "poison"].map((e) => {
@@ -1363,7 +1464,7 @@
     const b = buildOf(c);
     if (!b) { body.innerHTML = `<div class="card"><p>No build guide for ${esc(c.cls)} yet — gear tracking still works.</p></div>`; return; }
     const target = Number(c.budget);
-    const allSlots = [...GEAR_SLOTS, ...MERC_SLOTS];
+    const allSlots = [...GEAR_SLOTS, ...mercSlots(c)];
     const recs = allSlots.map((s) => ({ s, r: recommendations(c, s.key) })).filter((x) => x.r.status !== "none");
     // Priority: bigger gap first; main gear before weapon swap before merc.
     const prio = ({ s, r }) => (r.gap ?? 3) * 10 - (s.key.startsWith("merc") ? 4 : s.key === "swap" ? 6 : 0);
@@ -1389,9 +1490,6 @@
     // stat & resist summary
     const sum = statSummary(c);
     const RES_NAME = { fire: "Fire", cold: "Cold", light: "Lightning", poison: "Poison" };
-    const OTHER = [["skills", "All skills", ""], ["life", "Life", ""], ["mana", "Mana", ""], ["fhr", "FHR", "%"], ["frw", "FRW", "%"], ["ias", "IAS", "%"], ["mf", "Magic find", "%"], ["dr", "Phys. dmg reduced", "%"], ["str", "Strength", ""], ["dex", "Dexterity", ""], ["vit", "Vitality", ""], ["enr", "Energy", ""]];
-    const KEY_LABEL = { allres: "all res", fire: "fire res", cold: "cold res", light: "light res", poison: "poison res", max_fire: "max fire", max_cold: "max cold", max_light: "max light", max_poison: "max poison", skills: "skills", life: "life", mana: "mana", fhr: "% FHR", frw: "% FRW", ias: "% IAS", mf: "% MF", dr: "% DR", str: "str", dex: "dex", vit: "vit", enr: "energy" };
-    const others = OTHER.filter(([k]) => sum.totals[k]);
     const typicalCount = sum.sources.filter((x) => !x.actual && Object.keys(x.got).length).length;
     const statsHtml = `<div class="card stat-sum">
         <h3>Stats &amp; resists</h3>
@@ -1405,10 +1503,11 @@
             <span class="rt-cap">${r.raw >= r.cap ? (r.raw > r.cap ? `max ${r.cap} · ${r.raw - r.cap} over` : `max ${r.cap}`) : `need +${r.cap - r.raw}`}</span>
           </div>`).join("")}</div>
         <p class="notes">${esc(sum.diff)} penalty −${RES_PENALTY[sum.diff]}%${sum.anya ? `, Anya +${sum.anya * 10}%` : ""}. Worn gear and charms; weapon swap and merc not counted.</p>
-        ${others.length ? `<dl class="ss-other">${others.map(([k, l, u]) => `<div><dt>${l}</dt><dd>${sum.totals[k] > 0 ? "+" : ""}${sum.totals[k]}${u}</dd></div>`).join("")}</dl>` : ""}
+        ${otherStatsHTML(sum.totals)}
+        ${auraList(sum.totals).length ? `<p class="notes">Auras from gear: ${auraList(sum.totals).map(esc).join(", ")}</p>` : ""}
         ${typicalCount ? `<p class="notes">${typicalCount} item${typicalCount === 1 ? " has" : "s have"} no actual stats, so ${typicalCount === 1 ? "its" : "their"} lowest typical roll is used. Add actual stats (Scan or Type stats on the Gear tab) for exact numbers.</p>` : ""}
         <details class="ss-src"><summary>Where it comes from</summary>
-          <ul>${sum.sources.filter((x) => Object.keys(x.got).length).map((x) => `<li><b>${esc(x.label)}</b> ${esc(x.it.name)}${x.actual ? "" : ` <span class="badge">typical</span>`}<div class="notes">${Object.entries(x.got).map(([k, v]) => `${v > 0 ? "+" : ""}${v}${String(KEY_LABEL[k] || k).startsWith("%") ? "" : " "}${KEY_LABEL[k] || k}`).join(" · ")}</div></li>`).join("") || `<li class="notes">No stats found on worn gear yet.</li>`}</ul>
+          ${sourcesHTML(sum.sources)}
           <p class="notes">Socketed jewels, runes and set bonuses count only if you type them into an item's actual stats.</p>
         </details>
       </div>`;

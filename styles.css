@@ -368,3 +368,8 @@ input.qn:focus { outline: none; border-color: var(--accent); background: rgba(12
 .ss-src ul { list-style: none; padding: 0; margin: 8px 0; }
 .ss-src li { padding: 6px 0; border-top: 1px solid var(--line); }
 @media (max-width: 420px) { .rt-val { font-size: 19px; } }
+
+/* Mercenary header */
+.merc-head { margin-bottom: 12px; }
+.merc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 6px 0 8px; }
+.merc-sum .res-tile .rt-val { color: var(--text, inherit); }
