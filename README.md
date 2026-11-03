@@ -22,6 +22,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 - Gems & Cube tab: gem inventory by grade, Horadric Cube rune and gem upgrades you can do right now, and a checker for whether you can cube up to a specific rune
 - Skills tab: suggested skill point order and amounts plus stat points for all 40 builds
 - Upgrades tab: stash upgrades first, then per-slot suggestions with Traderie links, FCR breakpoint check for caster builds, missing charms
+- Stats & resists summary (Upgrades tab): fire, cold, lightning and poison resists after the Normal/Nightmare/Hell penalty and Anya scrolls, against your max (75 plus any +max res), plus totals for all skills, life, mana, FHR, FRW, IAS, MF, damage reduced and attributes from worn gear and charms. Uses each item's actual stats when you've entered them, otherwise its lowest typical roll, and shows where each number comes from.
 
 ## Recording your item's actual stats
 Every item you own — worn, on the merc, in the charm inventory or in the shared stash — shows two blocks: **Typical stats** (what the item can roll, from the game data) and **Actual stats** (the rolls on *your* copy). Actual stats are optional, but they're what tells a 15% Enigma from a perfect one when you're comparing or trading.

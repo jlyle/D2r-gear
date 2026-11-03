@@ -1302,6 +1302,63 @@
       </div>`;
   }
 
+
+  // ---------- stat & resist summary ----------
+  // Reads stat lines in either game tooltip form ("Fire Resist +30%") or the short
+  // typical form ("+20-30 all res"). Ranges count at their low end.
+  const SUM_E = "(?:fire|cold|lightning|light|poison)";
+  const SUM_EL = `(${SUM_E}(?:\\s*(?:/|&|,|and)\\s*${SUM_E})*)`;
+  const SUM_N = "([+-]?\\d+)(?:\\s*-\\s*\\d+)?";
+  const elemKey = (e) => (e.startsWith("light") ? "light" : e);
+  const elemsIn = (txt) => (txt.match(new RegExp(SUM_E, "g")) || []).map(elemKey);
+  function parseStatLine(line) {
+    let l = String(line).toLowerCase().replace(/\s*\(check\)$/, "");
+    const out = [];
+    const add = (k, v) => { const n = Number(v); if (n) out.push([k, n]); };
+    if (/enemy|target|monster|pierce|sunder|skill damage|\bvs\b/.test(l)) return out;
+    l = l.replace(new RegExp(SUM_N + "%\\s*(?:to\\s+)?max(?:imum)?\\s+" + SUM_EL + "\\s+res\\w*", "g"), (m, n, el) => { elemsIn(el).forEach((e) => add("max_" + e, n)); return " "; });
+    l = l.replace(new RegExp(SUM_N + "%?\\s*(?:to\\s+)?all res\\w*", "g"), (m, n) => { add("allres", n); return " "; });
+    l = l.replace(/all resist\w*\s*[:.]?\s*\+?(\d+)%?/g, (m, n) => { add("allres", n); return " "; });
+    l = l.replace(new RegExp(SUM_EL + "\\s+resist\\w*\\s*[:.]?\\s*" + SUM_N + "%?", "g"), (m, el, n) => { elemsIn(el).forEach((e) => add(e, n)); return " "; });
+    l = l.replace(new RegExp(SUM_N + "%?\\s*(?:to\\s+)?" + SUM_EL + "\\s+res\\w*", "g"), (m, n, el) => { elemsIn(el).forEach((e) => add(e, n)); return " "; });
+    let m;
+    if ((m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?all skills")))) add("skills", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster hit recovery|fhr)\\b")))) add("fhr", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:faster run/walk|frw)\\b")))) add("frw", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:increased attack speed|ias)\\b")))) add("ias", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "%\\s*(?:better chance of getting magic items|mf|magic find)\\b")))) add("mf", m[1]);
+    if ((m = l.match(/damage reduced by (\d+)%/)) || (m = l.match(new RegExp(SUM_N + "%\\s*(?:dr|damage reduction|physical damage reduction)\\b")))) add("dr", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?all attributes")))) ["str", "dex", "vit", "enr"].forEach((k) => add(k, m[1]));
+    else {
+      const ATT = { strength: "str", str: "str", dexterity: "dex", dex: "dex", vitality: "vit", vit: "vit", energy: "enr" };
+      for (const mm of l.matchAll(new RegExp(SUM_N + "\\s*(?:to\\s+)?(strength|dexterity|vitality|energy|str|dex|vit)\\b", "g"))) add(ATT[mm[2]], mm[1]);
+    }
+    if (!/replenish life/.test(l) && (m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?life\\b(?!\\s*(?:after|stolen|per|tap|leech|&))")))) add("life", m[1]);
+    if ((m = l.match(new RegExp(SUM_N + "\\s*(?:to\\s+)?mana\\b(?!\\s*(?:after|stolen|per|leech|&))")))) add("mana", m[1]);
+    return out;
+  }
+  const RES_PENALTY = { Normal: 0, Nightmare: 40, Hell: 100 };
+  function statSummary(c) {
+    const totals = {}, sources = [];
+    const take = (label, entry) => {
+      const it = byName.get(entry?.item); if (!it) return;
+      const mine = noteLines(entry.note);
+      const lines = mine.length ? mine : statLines(it.stats);
+      const got = {};
+      for (const ln of lines) for (const [k, v] of parseStatLine(ln)) { got[k] = (got[k] || 0) + v; totals[k] = (totals[k] || 0) + v; }
+      sources.push({ label, it, actual: !!mine.length, got });
+    };
+    for (const s of GEAR_SLOTS) if (s.key !== "swap") take(s.label, c.gear[s.key]);
+    for (const ch of c.charms) take("Charm", ch);
+    const diff = RES_PENALTY[c.resDiff] !== undefined ? c.resDiff : "Hell";
+    const anya = c.anya === undefined ? 3 : Math.min(3, Math.max(0, Number(c.anya) || 0));
+    const res = ["fire", "cold", "light", "poison"].map((e) => {
+      const raw = (totals[e] || 0) + (totals.allres || 0) + anya * 10 - RES_PENALTY[diff];
+      const cap = Math.min(95, 75 + (totals["max_" + e] || 0));
+      return { e, raw, cap, val: Math.min(raw, cap) };
+    });
+    return { totals, sources, res, diff, anya };
+  }
   function renderUpgrades(body, c) {
     const b = buildOf(c);
     if (!b) { body.innerHTML = `<div class="card"><p>No build guide for ${esc(c.cls)} yet — gear tracking still works.</p></div>`; return; }
@@ -1329,6 +1386,33 @@
       </div>`;
     }
 
+    // stat & resist summary
+    const sum = statSummary(c);
+    const RES_NAME = { fire: "Fire", cold: "Cold", light: "Lightning", poison: "Poison" };
+    const OTHER = [["skills", "All skills", ""], ["life", "Life", ""], ["mana", "Mana", ""], ["fhr", "FHR", "%"], ["frw", "FRW", "%"], ["ias", "IAS", "%"], ["mf", "Magic find", "%"], ["dr", "Phys. dmg reduced", "%"], ["str", "Strength", ""], ["dex", "Dexterity", ""], ["vit", "Vitality", ""], ["enr", "Energy", ""]];
+    const KEY_LABEL = { allres: "all res", fire: "fire res", cold: "cold res", light: "light res", poison: "poison res", max_fire: "max fire", max_cold: "max cold", max_light: "max light", max_poison: "max poison", skills: "skills", life: "life", mana: "mana", fhr: "% FHR", frw: "% FRW", ias: "% IAS", mf: "% MF", dr: "% DR", str: "str", dex: "dex", vit: "vit", enr: "energy" };
+    const others = OTHER.filter(([k]) => sum.totals[k]);
+    const typicalCount = sum.sources.filter((x) => !x.actual && Object.keys(x.got).length).length;
+    const statsHtml = `<div class="card stat-sum">
+        <h3>Stats &amp; resists</h3>
+        <div class="ss-ctl">
+          <div class="field"><label for="resDiff">Difficulty</label><select id="resDiff">${Object.keys(RES_PENALTY).map((d) => `<option ${d === sum.diff ? "selected" : ""}>${d}</option>`).join("")}</select></div>
+          <div class="field"><label for="anya">Anya scrolls used</label><select id="anya">${[0, 1, 2, 3].map((n) => `<option ${n === sum.anya ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+        </div>
+        <div class="res-grid">${sum.res.map((r) => `<div class="res-tile res-${r.e} ${r.raw < 0 ? "bad" : r.raw < r.cap ? "low" : "ok"}">
+            <span class="rt-name">${RES_NAME[r.e]}</span>
+            <span class="rt-val">${r.val}%</span>
+            <span class="rt-cap">${r.raw >= r.cap ? (r.raw > r.cap ? `max ${r.cap} · ${r.raw - r.cap} over` : `max ${r.cap}`) : `need +${r.cap - r.raw}`}</span>
+          </div>`).join("")}</div>
+        <p class="notes">${esc(sum.diff)} penalty −${RES_PENALTY[sum.diff]}%${sum.anya ? `, Anya +${sum.anya * 10}%` : ""}. Worn gear and charms; weapon swap and merc not counted.</p>
+        ${others.length ? `<dl class="ss-other">${others.map(([k, l, u]) => `<div><dt>${l}</dt><dd>${sum.totals[k] > 0 ? "+" : ""}${sum.totals[k]}${u}</dd></div>`).join("")}</dl>` : ""}
+        ${typicalCount ? `<p class="notes">${typicalCount} item${typicalCount === 1 ? " has" : "s have"} no actual stats, so ${typicalCount === 1 ? "its" : "their"} lowest typical roll is used. Add actual stats (Scan or Type stats on the Gear tab) for exact numbers.</p>` : ""}
+        <details class="ss-src"><summary>Where it comes from</summary>
+          <ul>${sum.sources.filter((x) => Object.keys(x.got).length).map((x) => `<li><b>${esc(x.label)}</b> ${esc(x.it.name)}${x.actual ? "" : ` <span class="badge">typical</span>`}<div class="notes">${Object.entries(x.got).map(([k, v]) => `${v > 0 ? "+" : ""}${v}${String(KEY_LABEL[k] || k).startsWith("%") ? "" : " "}${KEY_LABEL[k] || k}`).join(" · ")}</div></li>`).join("") || `<li class="notes">No stats found on worn gear yet.</li>`}</ul>
+          <p class="notes">Socketed jewels, runes and set bonuses count only if you type them into an item's actual stats.</p>
+        </details>
+      </div>`;
+
     // charm checklist
     const have = new Set(c.charms.map((ch) => ch.item));
     const missingCharms = b.charms.filter((n) => !have.has(n));
@@ -1354,6 +1438,7 @@
         return `<div class="card up stash-card"><h3>From your stash</h3><div class="now">Already yours — free upgrades for ${esc(c.name)}</div>
           <ul class="sugg">${su.map((u) => `<li data-id="${u.entry.id}" data-slot="${u.slotKey || ""}"><div>${itemLine(u.it)}<div class="s-stats">${esc(u.label)} · ${esc(u.why)}</div>${locOf(u.entry) ? `<div class="s-stats loc-tag">📍 ${esc(locOf(u.entry))}</div>` : ""}</div><button class="btn small eq">Equip</button></li>`).join("")}</ul></div>`;
       })()}
+      ${statsHtml}
       <div class="card notes" style="margin-bottom:12px">${esc(b.notes)}</div>
       ${todo.length ? todo.map(({ s, r }) => {
         const curIt = byName.get(c.gear[s.key]?.item);
@@ -1369,6 +1454,8 @@
       const e = state.stash.find((x) => x.id === li.dataset.id);
       $(".eq", li).onclick = () => equipFromStash(c, e, li.dataset.slot);
     });
+    $("#resDiff").onchange = (e) => { c.resDiff = e.target.value; save(); render(); };
+    $("#anya").onchange = (e) => { c.anya = Number(e.target.value); save(); render(); };
     const ef = $("#extraFcr");
     if (ef) ef.onchange = (e) => { c.extraFcr = Number(e.target.value) || 0; save(); render(); };
   }
