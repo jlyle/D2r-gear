@@ -9,7 +9,7 @@
 const CLASSES = ["Amazon", "Assassin", "Barbarian", "Druid", "Necromancer", "Paladin", "Sorceress", "Warlock"];
 
 // App version: goes into backup file names. Keep in step with "version" in the Android app's package.json.
-const APP_VERSION = "1.4.3";
+const APP_VERSION = "1.4.4";
 
 const ITEMS = [
   // ---------- HELMS ----------
