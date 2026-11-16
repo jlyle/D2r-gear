@@ -63,6 +63,13 @@ for (const r of R) {
   rwTypes[STR[r.Name] || r["*Rune Name"]] = { n, it, ex };
 }
 // Keep only the parts of the type tree the bases and runewords use.
+// Inventory size (width x height) of every item bigger than one cell, by name, for stash slot counts.
+const itemSizes = {};
+for (const b of [...W, ...A, ...Object.values(J("misc"))]) {
+  if (!b.name || !b.code) continue;
+  const w = Number(b.invwidth) || 1, h = Number(b.invheight) || 1;
+  if (w * h > 1) itemSizes[b.name] = [w, h];
+}
 const used = new Set(); for (const b of Object.values(itemBases)) chain(b.type).forEach((c) => used.add(c));
 const tp = {}; for (const c of used) if (typeParents[c]?.length) tp[c] = typeParents[c];
 
@@ -71,5 +78,6 @@ const WEAPON_BASES = ${JSON.stringify(weaponBases)};
 const ITEM_BASES = ${JSON.stringify(itemBases)};
 const TYPE_PARENTS = ${JSON.stringify(tp)};
 const RW_TYPES = ${JSON.stringify(rwTypes)};
+const ITEM_SIZES = ${JSON.stringify(itemSizes)};
 `);
 console.log(Object.keys(weaponBases).length, "weapon bases,", Object.keys(itemBases).length, "socketable bases,", Object.keys(rwTypes).length, "runewords");
