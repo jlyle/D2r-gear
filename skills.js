@@ -147,3 +147,135 @@ const SKILL_PLANS = {
     ["Summon Goatman", "20", "Army"], ["Bind Demon", "20", ""], ["Demonic Mastery", "20", ""], ["Blood Oath", "20", ""],
     ["Death Mark", "rest", ""], ["Sigil: Lethargy / Sigil: Death / Engorge", "1", ""], ["Blood Boil", "rest", "Optional"]] },
 };
+
+// Leveling skill orders (src "lvl"): what to put points into as you level, before respeccing.
+// Points are roughly where the skill should be by level 60–75.
+const LVL_STATS = {
+  caster: { str: "About 50–75 for early gear (Spirit needs 95 later)", dex: "Base", vit: "Everything else", enr: "None — mana comes from Insight on your merc and potions" },
+  melee: { str: "Enough for your weapon and armor", dex: "Enough for your weapon", vit: "Everything else", enr: "None" },
+  bow: { str: "Enough for gear", dex: "About 2 of every 5 points until your bow's needs are met", vit: "Everything else", enr: "None" },
+};
+const LV_PLAN = (stats, note, skills) => ({ src: "lvl", stats, note, skills: [PRE, ...skills] });
+Object.assign(SKILL_PLANS, {
+  // ===== AMAZON =====
+  "lvl-fury-zon": LV_PLAN(LVL_STATS.melee, "Javelins only — no arrows to carry.", [
+    ["Jab", "1", "Lvl 1"], ["Power Strike", "5-10", "Lvl 6 — main attack until 30"], ["Charged Strike", "10", "Lvl 24 — bosses"],
+    ["Lightning Fury", "20", "Lvl 30 — main attack"], ["Lightning Bolt", "rest", "Synergy"], ["Dodge / Avoid / Evade", "1", "Defense"]]),
+  "lvl-poison-zon": LV_PLAN(LVL_STATS.melee, "", [
+    ["Poison Javelin", "5-10", "Lvl 6 — main attack early"], ["Plague Javelin", "20", "Lvl 18 — packs"],
+    ["Lightning Fury", "10", "Lvl 30 — poison immunes"], ["Dodge / Avoid / Evade", "1", "Defense"], ["Valkyrie", "1+", "Lvl 30 — tank"]]),
+  "lvl-mshot-zon": LV_PLAN(LVL_STATS.bow, "Magic Arrow needs no arrows; carry a stack for the others.", [
+    ["Magic Arrow", "1", "Lvl 1 — free arrows"], ["Multiple Shot", "20", "Lvl 6 — packs"], ["Guided Arrow", "5-10", "Lvl 18 — bosses"],
+    ["Strafe", "rest", "Lvl 24"], ["Critical Strike / Penetrate / Pierce", "1+", "Passives"], ["Valkyrie", "1+", "Lvl 30 — tank"]]),
+  "lvl-fire-zon": LV_PLAN(LVL_STATS.bow, "", [
+    ["Fire Arrow", "1", "Lvl 1"], ["Exploding Arrow", "10", "Lvl 12 — packs"], ["Immolation Arrow", "20", "Lvl 24 — main"],
+    ["Fire Arrow", "rest", "Synergy"], ["Decoy / Valkyrie", "1+", "Tanks"]]),
+  "lvl-freeze-zon": LV_PLAN(LVL_STATS.bow, "", [
+    ["Cold Arrow", "10", "Lvl 6 — main early"], ["Ice Arrow", "5", "Lvl 18 — freeze"], ["Freezing Arrow", "20", "Lvl 30 — packs"],
+    ["Cold Arrow", "rest", "Synergy"], ["Valkyrie", "1+", "Tank"]]),
+  // ===== ASSASSIN =====
+  "lvl-trap-sin": LV_PLAN(LVL_STATS.caster, "", [
+    ["Fire Blast", "10-15", "Lvl 1 — main attack early"], ["Lightning Sentry", "20", "Lvl 24 — main"], ["Death Sentry", "10", "Lvl 30 — corpse explosions"],
+    ["Shock Web / Charged Bolt Sentry", "rest", "Synergies"], ["Burst of Speed / Fade", "1", "Speed and resists"]]),
+  "lvl-wof-sin": LV_PLAN(LVL_STATS.caster, "", [
+    ["Fire Blast", "10-15", "Lvl 1 — main early"], ["Wake of Fire", "20", "Lvl 12 — packs"], ["Lightning Sentry", "10", "Lvl 24 — fire immunes"],
+    ["Death Sentry", "5", "Lvl 30"], ["Burst of Speed / Fade", "1", ""]]),
+  "lvl-kick-sin": LV_PLAN(LVL_STATS.melee, "Kick damage comes from your boots.", [
+    ["Fire Blast", "1-5", "Lvl 1 — ranged help early"], ["Dragon Talon", "20", "Lvl 1 — main"], ["Dragon Flight", "1", "Lvl 24 — teleport-kick"],
+    ["Death Sentry", "5-10", "Lvl 30 — packs"], ["Fade / Burst of Speed / Venom", "1+", ""]]),
+  "lvl-bf-sin": LV_PLAN(LVL_STATS.caster, "", [
+    ["Blade Sentinel", "5", "Lvl 6"], ["Blade Fury", "20", "Lvl 24 — main"], ["Blade Shield / Blade Sentinel", "rest", "Synergies"],
+    ["Fade / Burst of Speed / Shadow Warrior", "1+", ""]]),
+  "lvl-ma-sin": LV_PLAN(LVL_STATS.melee, "Charge with Tiger Strike, release with Dragon Claw.", [
+    ["Tiger Strike", "5-10", "Lvl 1 — charge damage"], ["Dragon Claw", "10", "Lvl 6 — finisher"], ["Fists of Fire / Claws of Thunder", "5", "Elemental charges"],
+    ["Phoenix Strike", "10-20", "Lvl 30 — immunes"], ["Burst of Speed / Fade / Venom", "1+", ""]]),
+  // ===== BARBARIAN =====
+  "lvl-frenzy-barb": LV_PLAN(LVL_STATS.melee, "Wield two one-handed weapons.", [
+    ["Double Swing", "5-10", "Lvl 6 — main early"], ["Frenzy", "20", "Lvl 24 — main"], ["Sword / Axe Mastery", "rest", "Your weapon type"],
+    ["Battle Orders / Shout / Battle Command", "1+", "Lvl 24–30 — survival"], ["Increased Speed", "1", "Run speed"]]),
+  "lvl-ww-barb": LV_PLAN(LVL_STATS.melee, "", [
+    ["Bash / Double Swing", "5", "Early attack"], ["Whirlwind", "20", "Lvl 30 — main"], ["Weapon mastery", "rest", "Your weapon type"],
+    ["Battle Orders / Shout / Battle Command", "1+", ""], ["Increased Speed", "1", ""]]),
+  "lvl-berserk-barb": LV_PLAN(LVL_STATS.melee, "", [
+    ["Bash", "10", "Lvl 1 — main early"], ["Berserk", "20", "Lvl 30 — magic damage"], ["Howl / Shout / Battle Orders", "1+", ""],
+    ["Weapon mastery", "rest", "Your weapon type"], ["Natural Resistance", "1+", ""]]),
+  "lvl-leap-barb": LV_PLAN(LVL_STATS.melee, "", [
+    ["Bash", "5", "Lvl 1"], ["Leap Attack", "20", "Lvl 18 — main"], ["Leap", "rest", "Synergy"], ["Weapon mastery", "5+", ""],
+    ["Battle Orders / Shout", "1+", ""]]),
+  "lvl-throw-barb": LV_PLAN(LVL_STATS.melee, "Carry spare stacks of javelins or throwing axes.", [
+    ["Double Swing", "1", "Prereq"], ["Double Throw", "20", "Lvl 24 — main"], ["Throwing Mastery", "rest", ""],
+    ["Battle Orders / Shout", "1+", ""], ["Increased Speed", "1", ""]]),
+  // ===== DRUID =====
+  "lvl-fire-druid": LV_PLAN(LVL_STATS.caster, "", [
+    ["Firestorm", "5", "Lvl 1"], ["Fissure", "20", "Lvl 12 — main"], ["Volcano", "10", "Lvl 24 — bosses"], ["Molten Boulder", "rest", "Synergy"],
+    ["Raven / Spirit Wolf / Grizzly", "1+", "Tanks"], ["Oak Sage", "1", "Life"]]),
+  "lvl-wind-druid": LV_PLAN(LVL_STATS.caster, "", [
+    ["Arctic Blast", "5-10", "Lvl 6 — main early"], ["Twister", "5", "Lvl 18 — stun"], ["Tornado", "20", "Lvl 24 — main"], ["Hurricane", "rest", "Lvl 30"],
+    ["Raven / Spirit Wolf", "1+", "Tanks"], ["Oak Sage", "1", ""]]),
+  "lvl-summon-druid": LV_PLAN(LVL_STATS.caster, "Your pets do the work.", [
+    ["Raven", "1-5", "Lvl 1"], ["Summon Spirit Wolf", "10", "Lvl 6"], ["Summon Dire Wolf", "20", "Lvl 18 — main"], ["Summon Grizzly", "1+", "Lvl 30"],
+    ["Heart of the Wolverine / Oak Sage", "rest", "Spirit buffs"]]),
+  "lvl-wolf-druid": LV_PLAN(LVL_STATS.melee, "", [
+    ["Werewolf", "1+", "Lvl 1"], ["Lycanthropy", "5-10", "Life and duration"], ["Feral Rage", "5-10", "Lvl 12 — speed and leech"], ["Fury", "20", "Lvl 24 — main"],
+    ["Oak Sage / Heart of the Wolverine", "1+", ""]]),
+  "lvl-bear-druid": LV_PLAN(LVL_STATS.melee, "", [
+    ["Werebear", "1+", "Lvl 6"], ["Maul", "5-10", "Lvl 12 — main early"], ["Shock Wave", "20", "Lvl 24 — stun packs"], ["Lycanthropy", "rest", ""],
+    ["Oak Sage / Heart of the Wolverine", "1+", ""]]),
+  // ===== NECROMANCER =====
+  "lvl-summon-necro": LV_PLAN(LVL_STATS.caster, "Raise skeletons from every corpse.", [
+    ["Raise Skeleton", "20", "Lvl 1 — main"], ["Skeleton Mastery", "rest", "Lvl 1"], ["Amplify Damage", "1", "Lvl 1"], ["Clay Golem", "1+", "Lvl 6 — slows monsters"],
+    ["Corpse Explosion", "5", "Lvl 6 — packs"], ["Summon Resist / Raise Skeletal Mage", "1+", ""]]),
+  "lvl-bone-necro": LV_PLAN(LVL_STATS.caster, "", [
+    ["Teeth", "5-10", "Lvl 1 — main early"], ["Bone Spear", "20", "Lvl 18 — main"], ["Bone Wall / Bone Prison", "rest", "Synergies"],
+    ["Amplify Damage", "1", ""], ["Clay Golem", "1", "Tank"]]),
+  "lvl-poison-necro": LV_PLAN(LVL_STATS.caster, "", [
+    ["Poison Dagger", "5", "Lvl 1 — early"], ["Poison Explosion", "5-10", "Lvl 12"], ["Poison Nova", "20", "Lvl 30 — main"], ["Lower Resist", "1+", "Lvl 30"],
+    ["Raise Skeleton / Clay Golem", "1+", "Tanks"]]),
+  "lvl-ce-necro": LV_PLAN(LVL_STATS.caster, "", [
+    ["Teeth", "5", "Lvl 1 — first kills"], ["Amplify Damage", "1+", "Lvl 1"], ["Corpse Explosion", "20", "Lvl 6 — main"], ["Raise Skeleton", "5", "Make corpses"],
+    ["Clay Golem / Iron Maiden", "1+", ""]]),
+  "lvl-fishy-necro": LV_PLAN(LVL_STATS.melee, "You fight in melee next to your golem.", [
+    ["Clay Golem / Blood Golem / Iron Golem", "1+", "Golem line"], ["Golem Mastery", "10", ""], ["Raise Skeleton", "10", ""], ["Amplify Damage", "1+", ""],
+    ["Skeleton Mastery", "rest", ""]]),
+  // ===== PALADIN =====
+  "lvl-hammer-pal": LV_PLAN(LVL_STATS.caster, "", [
+    ["Holy Bolt / Zeal", "1-5", "Early attack"], ["Blessed Hammer", "20", "Lvl 18 — main"], ["Concentration", "20", "Lvl 18 — aura"],
+    ["Blessed Aim / Vigor", "rest", "Synergies"], ["Holy Shield", "1", "Lvl 24"]]),
+  "lvl-zeal-pal": LV_PLAN(LVL_STATS.melee, "", [
+    ["Sacrifice", "5", "Lvl 6"], ["Zeal", "20", "Lvl 12 — main"], ["Might", "5", "Aura early"], ["Fanaticism", "20", "Lvl 30 — aura"],
+    ["Holy Shield", "1+", "Lvl 24"]]),
+  "lvl-venge-pal": LV_PLAN(LVL_STATS.melee, "", [
+    ["Sacrifice / Zeal", "1-5", "Early"], ["Vengeance", "20", "Lvl 18 — main"], ["Conviction", "10-20", "Lvl 24 — aura"],
+    ["Resist Fire / Cold / Lightning", "rest", "Synergies"], ["Holy Shield", "1", ""]]),
+  "lvl-holyfire-pal": LV_PLAN(LVL_STATS.melee, "", [
+    ["Zeal", "10", "Lvl 12 — attack"], ["Holy Fire", "20", "Lvl 6 — aura does the damage"], ["Resist Fire", "rest", "Synergy"], ["Salvation", "1", ""]]),
+  "lvl-foh-pal": LV_PLAN(LVL_STATS.caster, "", [
+    ["Holy Bolt", "20", "Lvl 6 — main early"], ["Fist of the Heavens", "20", "Lvl 30 — main"], ["Conviction", "10-20", "Lvl 30 — aura"],
+    ["Holy Shock", "rest", "Synergy"], ["Holy Shield", "1", ""]]),
+  // ===== SORCERESS =====
+  "lvl-blizz-sorc": LV_PLAN(LVL_STATS.caster, "", [
+    ["Frost Nova", "5", "Lvl 6 — early"], ["Ice Blast", "10", "Lvl 12"], ["Blizzard", "20", "Lvl 24 — main"], ["Static Field", "5", "Lvl 6 — bosses"],
+    ["Teleport / Frozen Armor / Warmth", "1", ""], ["Cold Mastery", "1+", "Lvl 30"]]),
+  "lvl-fire-sorc": LV_PLAN(LVL_STATS.caster, "", [
+    ["Fire Bolt", "5", "Lvl 1"], ["Fireball", "20", "Lvl 12 — main"], ["Meteor", "10-20", "Lvl 24"], ["Fire Mastery", "1+", "Lvl 30"],
+    ["Static Field / Teleport / Warmth", "1+", ""]]),
+  "lvl-light-sorc": LV_PLAN(LVL_STATS.caster, "", [
+    ["Charged Bolt", "10", "Lvl 1 — main early"], ["Nova", "10", "Lvl 12"], ["Chain Lightning", "20", "Lvl 18 — main"], ["Static Field", "5", ""],
+    ["Teleport / Warmth / Frozen Armor", "1", ""], ["Lightning Mastery", "1+", "Lvl 30"]]),
+  "lvl-orb-sorc": LV_PLAN(LVL_STATS.caster, "", [
+    ["Ice Bolt", "1-5", "Lvl 1"], ["Ice Blast", "10", "Lvl 6 — main early"], ["Glacial Spike", "5", "Lvl 18 — freeze packs"], ["Frozen Orb", "20", "Lvl 30 — main"],
+    ["Static Field / Teleport / Warmth", "1+", ""], ["Cold Mastery", "1+", ""]]),
+  "lvl-firewall-sorc": LV_PLAN(LVL_STATS.caster, "", [
+    ["Fire Bolt", "5", "Lvl 1"], ["Fire Wall", "20", "Lvl 18 — main"], ["Hydra", "10-20", "Lvl 30"], ["Warmth / Static Field / Teleport", "1+", ""]]),
+  // ===== WARLOCK =====
+  "lvl-echo-lock": LV_PLAN(STAT_TEXT.warlock, "Warlock is new — check a current guide for unlock levels.", [
+    ["Mirrored Blades", "5-10", "Early attack"], ["Echoing Strike", "20", "Main once unlocked"], ["Blade Warp", "rest", "Synergy and movement"], ["Bind Demon", "1+", "Tank"]]),
+  "lvl-fire-lock": LV_PLAN(STAT_TEXT.warlock, "Warlock is new — check a current guide for unlock levels.", [
+    ["Ring of Fire", "10", "Early"], ["Flame Wave", "20", "Packs"], ["Apocalypse", "10-20", "Later"], ["Summon Tainted", "1+", "Tank"], ["Consume", "1+", ""]]),
+  "lvl-miasma-lock": LV_PLAN(STAT_TEXT.warlock, "Warlock is new — check a current guide for unlock levels.", [
+    ["Miasma Bolt", "10", "Early"], ["Miasma Chain", "20", "Packs"], ["Abyss", "5-10", "Later"], ["Summon Defiler", "1+", "Tank"], ["Consume", "1+", ""]]),
+  "lvl-blades-lock": LV_PLAN(STAT_TEXT.warlock, "Warlock is new — check a current guide for unlock levels.", [
+    ["Mirrored Blades", "20", "Main"], ["Blade Warp", "10", "Movement and synergy"], ["Echoing Strike", "10", "Packs"], ["Hex: Bane", "1+", ""]]),
+  "lvl-demon-lock": LV_PLAN(STAT_TEXT.warlock, "Warlock is new — check a current guide for unlock levels.", [
+    ["Summon Goatman", "20", "Army"], ["Bind Demon", "10", ""], ["Demonic Mastery", "10", ""], ["Death Mark / Blood Oath", "1+", "Boost the army"]]),
+});

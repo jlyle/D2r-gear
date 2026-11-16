@@ -2,6 +2,9 @@
 (() => {
   const STORE_KEY = "gearLedger.v1";
   const TIER_NAMES = ["Starter", "Mid", "Endgame"];
+  // Leveling builds use level stages instead of budget tiers, picked from the character's level.
+  const LEVEL_TIER_NAMES = ["Lvl 1–30", "Lvl 30–60", "Lvl 60+"];
+  const levelStage = (c) => { const l = Number(c.level) || 1; return l < 30 ? 0 : l < 60 ? 1 : 2; };
   const INV_CELLS = 40; // 10 x 4 inventory
   const $ = (s, el = document) => el.querySelector(s);
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -301,6 +304,8 @@
 
   const cur = () => state.chars.find((c) => c.id === state.current) || null;
   const buildOf = (c) => BUILDS.find((b) => b.id === c.build) || null;
+  const tierNamesOf = (c) => (buildOf(c)?.leveling ? LEVEL_TIER_NAMES : TIER_NAMES);
+  const targetTier = (c) => (buildOf(c)?.leveling ? levelStage(c) : Math.min(Number(c.budget) || 0, 2));
 
   function newChar() {
     // New characters start in the current character's mode, or the first mode with a free slot.
@@ -362,7 +367,7 @@
   const fitsSlot = (it, c, key) => { const L = lvlFor(c, key); return !L || !it.req || it.req <= L; };
   // Tier lists for a slot: merc types other than Act 2 have their own weapon lists.
   function tiersFor(build, slotKey, c) {
-    if (c && slotKey.startsWith("merc")) { const o = MERC_RECS[mercType(c).key]?.[slotKey]; if (o) return o; }
+    if (c && slotKey.startsWith("merc") && !build?.leveling) { const o = MERC_RECS[mercType(c).key]?.[slotKey]; if (o) return o; }
     return build?.tiers[listKey(slotKey)];
   }
 
@@ -379,7 +384,7 @@
     if (!b) return { status: "nobuild", items: [] };
     const tiers = tiersFor(b, slotKey, c);
     if (!tiers) return { status: "none", items: [] };
-    const target = Math.min(c.budget, 2);
+    const target = targetTier(c);
     const curName = c.gear[slotKey]?.item;
     const t = curName ? tierOf(b, slotKey, curName, c) : -2; // -2 empty, -1 off-build
     if (t >= target) return { status: "ok", tier: t, items: [] };
@@ -437,8 +442,8 @@
         <div class="field"><label>Name</label><input type="text" id="fName" value="${esc(c.name)}"></div>
         <div class="field"><label>Class</label><select id="fCls">${CLASSES.map((k) => `<option ${k === c.cls ? "selected" : ""}>${k}</option>`).join("")}</select></div>
         <div class="field"><label>Level</label><input type="number" id="fLvl" min="1" max="99" value="${esc(c.level)}"></div>
-        <div class="field"><label>Build</label><select id="fBuild">${builds.length ? builds.map((b) => `<option value="${b.id}" ${b.id === c.build ? "selected" : ""}>${esc(b.name)}</option>`).join("") : `<option value="">No guide yet for ${c.cls}</option>`}</select></div>
-        <div class="field"><label>Budget target</label><select id="fBudget">${TIER_NAMES.map((n, i) => `<option value="${i}" ${i === Number(c.budget) ? "selected" : ""}>${n}</option>`).join("")}</select></div>
+        <div class="field"><label>Build</label><select id="fBuild">${builds.length ? [["Endgame builds", builds.filter((b) => !b.leveling)], ["Leveling builds", builds.filter((b) => b.leveling)]].filter(([, l]) => l.length).map(([g, l]) => `<optgroup label="${g}">${l.map((b) => `<option value="${b.id}" ${b.id === c.build ? "selected" : ""}>${esc(b.name)}</option>`).join("")}</optgroup>`).join("") : `<option value="">No guide yet for ${c.cls}</option>`}</select></div>
+        ${buildOf(c)?.leveling ? `<div class="field"><label>Gear stage</label><select id="fBudget" disabled title="Set by level">${LEVEL_TIER_NAMES.map((n, i) => `<option ${i === levelStage(c) ? "selected" : ""}>${n} (from level)</option>`).join("")}</select></div>` : `<div class="field"><label>Budget target</label><select id="fBudget">${TIER_NAMES.map((n, i) => `<option value="${i}" ${i === Number(c.budget) ? "selected" : ""}>${n}</option>`).join("")}</select></div>`}
         <div class="field"><label>Mode</label><select id="fMode">${REALMS.map((m) => `<option value="${m}" ${m === realmOf(c) ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
@@ -456,7 +461,7 @@
     };
     $("#fLvl").onchange = (e) => { c.level = Math.max(1, Math.min(99, Number(e.target.value) || 1)); save(); render(); };
     $("#fBuild").onchange = (e) => { c.build = e.target.value; save(); render(); };
-    $("#fBudget").onchange = (e) => { c.budget = Number(e.target.value); save(); render(); };
+    $("#fBudget").onchange = (e) => { if (buildOf(c)?.leveling) return; c.budget = Number(e.target.value); save(); render(); };
     $("#fMode").onchange = (e) => {
       const g = groupOfMode(e.target.value);
       if (g !== groupOf(c) && groupFull(state.chars, g)) {
@@ -701,7 +706,7 @@
     const t = tierOf(buildOf(c), slotKey, name, c);
     if (t === null) return "";
     if (t === -1) return `<span class="badge off">off-build</span>`;
-    return `<span class="badge t${t}">${TIER_NAMES[t]}</span>`;
+    return `<span class="badge t${t}">${tierNamesOf(c)[t]}</span>`;
   }
 
   function itemLine(it) {
@@ -1604,7 +1609,7 @@
         <p class="notes">Max them in this order. At level ${lvl} you have about <b>${have}</b> points (${Math.max(0, lvl - 1)} from levels + ${quest} from quests: Den of Evil, Radament and Izual in each difficulty). This plan places about ${fixed} points plus prerequisites; "rest" takes whatever is left.</p>
         ${plan.note ? `<p class="notes" style="color:var(--text)">${esc(plan.note)}</p>` : ""}
         <ol class="sk-list">${rows}</ol>
-        <p class="notes sk-src">${plan.src === "iv" ? "Matches the current Icy Veins skill guide for this build." : "Long-standing community allocation for this build — if a patch changed its synergies, check a current guide."} These are the points you spend yourself — +skills from gear add on top.</p>
+        <p class="notes sk-src">${plan.src === "lvl" ? "Leveling order — follow it as you level, then respec into an endgame build once your gear is ready (Akara gives one free respec after Den of Evil each difficulty; a Token of Absolution gives more)." : plan.src === "iv" ? "Matches the current Icy Veins skill guide for this build." : "Long-standing community allocation for this build — if a patch changed its synergies, check a current guide."} These are the points you spend yourself — +skills from gear add on top.</p>
       </div>
       <div class="card" style="margin-top:12px">
         <h3>Stat points</h3>
@@ -1722,7 +1727,8 @@
   function renderUpgrades(body, c) {
     const b = buildOf(c);
     if (!b) { body.innerHTML = `<div class="card"><p>No build guide for ${esc(c.cls)} yet — gear tracking still works.</p></div>`; return; }
-    const target = Number(c.budget);
+    const target = targetTier(c);
+    const TIER_NAMES = tierNamesOf(c);
     const allSlots = [...GEAR_SLOTS, ...mercSlots(c)];
     const recs = allSlots.map((s) => ({ s, r: recommendations(c, s.key) })).filter((x) => x.r.status !== "none");
     // Priority: bigger gap first; main gear before weapon swap before merc.
@@ -1860,7 +1866,7 @@
           <div class="now">${now}</div>
           <ul class="sugg">${r.items.slice(0, 4).map((x) => `<li><div>${itemLine(x.item)}<div class="s-stats">${esc(x.item.stats)}</div>${x.stash ? "" : traderieLink(x.item)}</div><div class="badges">${x.stash ? `<span class="badge stash">In stash</span>` : ""}<span class="badge t${x.tier}">${x.gated ? `lvl ${x.item.req}` : TIER_NAMES[x.tier]}</span></div></li>`).join("")}</ul>
         </div>`;
-      }).join("") : `<div class="card"><p class="ok">Every slot meets your ${TIER_NAMES[target]} target. Raise the budget target to see the next step.</p></div>`}`;
+      }).join("") : `<div class="card"><p class="ok">Every slot meets your ${TIER_NAMES[target]} target. ${b.leveling ? "Level up (or pick an endgame build) to see the next step." : "Raise the budget target to see the next step."}</p></div>`}`;
 
     body.querySelectorAll(".stash-card li").forEach((li) => {
       const e = state.stash.find((x) => x.id === li.dataset.id);

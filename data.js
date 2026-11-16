@@ -91,6 +91,7 @@ const ITEMS = [
   { name: "The Reaper's Toll", type: "unique", slot: "weapon", merc: true, req: 75, stats: "Decrepify on hit, 11-15% LL, ignore target def" },
   { name: "Rare trap claw", type: "rare", slot: "weapon", cls: "Assassin", req: 1, fcr: 20, stats: "+3 Traps, +3 Lightning Sentry/Death Sentry, 20% FCR" },
   { name: "Magic caster weapon", type: "rare", slot: "weapon", req: 1, stats: "+2-3 to a class skill tree (wand, orb, staff, scepter)" },
+  { name: "Rare/Crafted javelins", type: "rare", slot: "weapon", req: 1, stats: "Throwing javelins or axes: high damage, IAS, replenish quantity; Amazon +Javelin skills" },
 
   // ---------- OFF-HAND / SHIELDS ----------
   { name: "Ancient's Pledge", type: "runeword", slot: "offhand", req: 21, runes: "Ral Ort Tal", stats: "+50% ED, +43-48 all res, 10% damage to mana" },
@@ -809,6 +810,194 @@ const BUILDS = [
     charms: CASTER_SKILLS,
     notes: "Goatmen + Bind Demon army with Blood Oath and Death Mark. A Might merc suits Goatmen; Holy Freeze suits caster demons. Mang Song/Obsession are two-handed — needs Levitation Mastery to keep the grimoire." },
 ];
+
+// ---------- LEVELING BUILDS ----------
+// Five per class. Their three tiers are level stages, not budgets: Lvl 1–30, 30–60, 60+.
+// The app picks the stage from the character's level. Gear is what drops or is easy to make.
+const LEVEL_CASTER = {
+  weapon: T(["Magic caster weapon"], ["Spirit (sword)", "Magic caster weapon"], ["Spirit (sword)", "Heart of the Oak"]),
+  offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Rhyme"], ["Spirit (shield)", "Lidless Wall"]),
+  helm: T(["Biggin's Bonnet", "Tarnhelm"], ["Lore", "Peasant Crown"], ["Lore", "Tarnhelm"]),
+  armor: T(["Stealth"], ["Stealth", "Smoke"], ["Smoke", "Skin of the Vipermagi"]),
+  gloves: T(["Magefist"], ["Magefist", "Chance Guards"], ["Magefist", "Frostburn"]),
+  belt: T(["Rare/Crafted belt"], ["Goldwrap", "Rare/Crafted belt"], ["Goldwrap", "Rare/Crafted belt"]),
+  boots: T(["Treads of Cthon", "Hotspur"], ["Infernostride", "Silkweave"], ["Silkweave", "Waterwalk"]),
+  amulet: T(["Nokozan Relic", "Rare amulet"], ["The Eye of Etlich", "Rare amulet"], ["Rare amulet", "The Eye of Etlich"]),
+  ring: T(["Nagelring", "Manald Heal"], ["Rare/Crafted FCR ring", "Nagelring"], ["Rare/Crafted FCR ring"]),
+  merc_weapon: T(["Malice", "Steel"], ["Insight"], ["Insight"]),
+  merc_helm: T(["Tarnhelm", "Biggin's Bonnet"], ["Lore", "Tarnhelm"], ["Tal Rasha's Horadric Crest", "Vampire Gaze"]),
+  merc_armor: T(["Stealth"], ["Smoke"], ["Smoke", "Treachery"]),
+};
+const LEVEL_MELEE = {
+  ...LEVEL_CASTER,
+  weapon: T(["Steel", "Malice"], ["Strength", "Kingslayer"], ["Crescent Moon", "Kingslayer", "Honor"]),
+  helm: T(["Biggin's Bonnet", "Tarnhelm"], ["Rockstopper", "Tarnhelm"], ["Rockstopper", "Vampire Gaze"]),
+  armor: T(["Stealth"], ["Smoke"], ["Smoke", "Duress"]),
+  gloves: T(["Bloodfist"], ["Bloodfist", "Crafted Blood gloves"], ["Crafted Blood gloves", "Laying of Hands"]),
+  belt: T(["Rare/Crafted belt"], ["Goldwrap"], ["Goldwrap", "Nosferatu's Coil"]),
+  boots: T(["Treads of Cthon", "Hotspur"], ["Infernostride", "Treads of Cthon"], ["Gore Rider", "Infernostride"]),
+  ring: T(["Nagelring", "Manald Heal"], ["Rare melee ring", "Manald Heal"], ["Rare melee ring", "Raven Frost"]),
+};
+const LEVEL_BOW = {
+  ...LEVEL_MELEE,
+  weapon: T(["Rare/Crafted bow"], ["Rare/Crafted bow", "Witchwild String"], ["Witchwild String", "Lycander's Aim"]),
+  offhand: null,
+  gloves: T(["Bloodfist", "Rare bow gloves"], ["Rare bow gloves"], ["Rare bow gloves"]),
+};
+const LEVEL_CHARMS = ["Small charm — life/res", "Grand charm (other)"];
+const LEVEL_CASTER_CHARMS = ["Small charm — life/res", "Skiller grand charm"];
+const LV = (id, name, cls, base, extra) => ({ id, name: `Leveling: ${name}`, cls, leveling: true, caster: false, base, charms: LEVEL_CHARMS, ...extra });
+
+const LEVELING_BUILDS = [
+  // ===== AMAZON =====
+  LV("lvl-fury-zon", "Lightning Fury Javazon", "Amazon", LEVEL_MELEE, {
+    slots: { weapon: T(["Rare/Crafted javelins"], ["Rare/Crafted javelins", "Titan's Revenge"], ["Titan's Revenge"]), gloves: T(["Bloodfist", "Rare javelin gloves"], ["Rare javelin gloves"], ["Rare javelin gloves"]) },
+    notes: "Jab and Power Strike carry you to 30; Lightning Fury takes over and clears packs for the rest of the game." }),
+  LV("lvl-poison-zon", "Poison / Plague Javelin", "Amazon", LEVEL_MELEE, {
+    slots: { weapon: T(["Rare/Crafted javelins"], ["Rare/Crafted javelins"], ["Rare/Crafted javelins", "Titan's Revenge"]), gloves: T(["Bloodfist", "Rare javelin gloves"], ["Rare javelin gloves"], ["Rare javelin gloves"]) },
+    notes: "Poison Javelin from level 6 kills almost everything in Normal; Plague Javelin at 18 clears packs. Pair with Lightning Fury later for immunes." }),
+  LV("lvl-mshot-zon", "Multi-Shot / Strafe Bowazon", "Amazon", LEVEL_BOW, {
+    notes: "Magic Arrow early (no arrows needed), Multi-Shot for packs, then Strafe at 24. Respec to Strafe or Multi-Shot endgame with Windforce or Faith." }),
+  LV("lvl-fire-zon", "Exploding / Immolation Arrow", "Amazon", LEVEL_BOW, {
+    notes: "Fire Arrow then Exploding Arrow early; Immolation Arrow at 24 burns whole packs. Good for players without a strong weapon — damage comes from skills." }),
+  LV("lvl-freeze-zon", "Cold / Freezing Arrow", "Amazon", LEVEL_BOW, {
+    notes: "Cold Arrow to 18, Freezing Arrow at 30 freezes packs solid. Safe for Hardcore because frozen monsters can't hit back." }),
+
+  // ===== ASSASSIN =====
+  LV("lvl-trap-sin", "Fire Blast → Lightning Sentry", "Assassin", LEVEL_CASTER, {
+    caster: true, fcrTarget: 65, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare trap claw"], ["Rare trap claw", "Spirit (sword)"], ["Rare trap claw", "Spirit (sword)"]) },
+    notes: "Fire Blast from level 1 is one of the easiest starts in the game. Lightning Sentry at 24, Death Sentry at 30 to blow up corpses." }),
+  LV("lvl-wof-sin", "Wake of Fire Trapsin", "Assassin", LEVEL_CASTER, {
+    caster: true, fcrTarget: 65, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare trap claw"], ["Rare trap claw", "Spirit (sword)"], ["Rare trap claw"]) },
+    notes: "Fire Blast early, then Wake of Fire at 12 for packs. Add Lightning Sentry later for fire immunes." }),
+  LV("lvl-kick-sin", "Dragon Talon Kicker", "Assassin", LEVEL_MELEE, {
+    slots: { weapon: T(["Rare trap claw"], ["Rare trap claw", "Bartuc's Cut-Throat"], ["Bartuc's Cut-Throat"]), boots: T(["Treads of Cthon"], ["Infernostride", "Gore Rider"], ["Gore Rider", "Shadow Dancer"]) },
+    notes: "Dragon Talon damage comes from your boots' kick damage, so upgrade boots first. Fire Blast and Death Sentry help with immunes." }),
+  LV("lvl-bf-sin", "Blade Fury", "Assassin", LEVEL_MELEE, {
+    caster: true, fcrTarget: 65, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare trap claw"], ["Rare trap claw", "Spirit (sword)"], ["Rare trap claw"]) },
+    notes: "Blade Sentinel early, Blade Fury at 24. Throwing damage — keep a claw with +Shadow or +Traps." }),
+  LV("lvl-ma-sin", "Martial Arts (Tiger / Phoenix Strike)", "Assassin", LEVEL_MELEE, {
+    slots: { weapon: T(["Rare trap claw"], ["Rare trap claw", "Bartuc's Cut-Throat"], ["Bartuc's Cut-Throat", "Jade Talon"]), offhand: T(["Rare off-hand claw"], ["Rare off-hand claw"], ["Rare off-hand claw"]) },
+    notes: "Tiger Strike charges plus Dragon Claw for damage; Phoenix Strike at 30 handles immunes. A stepping stone toward Mosaic." }),
+
+  // ===== BARBARIAN =====
+  LV("lvl-frenzy-barb", "Double Swing / Frenzy", "Barbarian", LEVEL_MELEE, {
+    slots: { offhand: T(["Steel", "Malice"], ["Strength", "Kingslayer"], ["Kingslayer", "Crescent Moon"]) },
+    notes: "Two weapons from the start: Double Swing early, Frenzy at 24 for big run speed and attack speed." }),
+  LV("lvl-ww-barb", "Whirlwind", "Barbarian", LEVEL_MELEE, {
+    slots: { offhand: T(["Steel", "Ancient's Pledge"], ["Strength", "Kingslayer"], ["Kingslayer", "Crescent Moon"]) },
+    notes: "Bash/Double Swing to 30, then Whirlwind. Weapon damage matters more than anything else — upgrade it first." }),
+  LV("lvl-berserk-barb", "Bash → Berserk", "Barbarian", LEVEL_MELEE, {
+    notes: "Bash until 30, then Berserk for magic damage that ignores physical immunity. Shout and Battle Orders keep you alive." }),
+  LV("lvl-leap-barb", "Leap Attack", "Barbarian", LEVEL_MELEE, {
+    notes: "Bash early, Leap Attack from 18 jumps onto packs and ranged monsters. Fun and fast but needs leech — Vampire Gaze or a leech ring later." }),
+  LV("lvl-throw-barb", "Double Throw", "Barbarian", LEVEL_MELEE, {
+    slots: { weapon: T(["Rare/Crafted javelins"], ["Rare/Crafted javelins"], ["Rare/Crafted javelins", "Gimmershred"]), offhand: T(["Rare/Crafted javelins"], ["Rare/Crafted javelins"], ["Rare/Crafted javelins", "Gimmershred"]) },
+    notes: "Throwing from range is very safe. Double Throw at 24; carry spare stacks and watch quantity." }),
+
+  // ===== DRUID =====
+  LV("lvl-fire-druid", "Firestorm → Fissure", "Druid", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    slots: { helm: T(["Biggin's Bonnet", "Rare druid pelt"], ["Rare druid pelt", "Lore"], ["Rare druid pelt"]) },
+    notes: "Firestorm from 1, Fissure at 12, Volcano at 24. Summon Spirit Wolves or a Grizzly to tank. Easy and strong." }),
+  LV("lvl-wind-druid", "Arctic Blast → Tornado", "Druid", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    slots: { helm: T(["Biggin's Bonnet", "Rare druid pelt"], ["Rare druid pelt", "Lore"], ["Rare druid pelt"]) },
+    notes: "Arctic Blast early, Twister at 18, Tornado at 24, Hurricane at 30. Respec to endgame Wind at Nightmare." }),
+  LV("lvl-summon-druid", "Summon Druid", "Druid", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    slots: { helm: T(["Biggin's Bonnet", "Rare druid pelt"], ["Rare druid pelt"], ["Rare druid pelt"]) },
+    notes: "Ravens and Spirit Wolves early, Dire Wolves at 18, Grizzly at 30. Your pets do the work; Heart of the Wolverine boosts them." }),
+  LV("lvl-wolf-druid", "Werewolf Fury", "Druid", LEVEL_MELEE, {
+    slots: { helm: T(["Biggin's Bonnet", "Rare druid pelt"], ["Rare Shape Shifting pelt", "Rare druid pelt"], ["Rare Shape Shifting pelt"]) },
+    notes: "Feral Rage early for speed and leech, Fury at 24. Weapon speed matters a lot — use a fast weapon." }),
+  LV("lvl-bear-druid", "Werebear Maul / Shock Wave", "Druid", LEVEL_MELEE, {
+    slots: { helm: T(["Biggin's Bonnet", "Rare druid pelt"], ["Rare Shape Shifting pelt", "Rare druid pelt"], ["Rare Shape Shifting pelt"]) },
+    notes: "Very tanky: Werebear and Maul early, Shock Wave at 24 stuns packs. Oak Sage or Heart of the Wolverine for support." }),
+
+  // ===== NECROMANCER =====
+  LV("lvl-summon-necro", "Skeleton Summoner", "Necromancer", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { offhand: T(["Rare necro head"], ["Rare necro head", "Homunculus"], ["Rare necro head", "Homunculus"]), weapon: T(["Magic caster weapon"], ["White", "Magic caster weapon"], ["White", "Magic caster weapon"]) },
+    notes: "The classic easiest leveler: Raise Skeleton from 1, Amplify Damage, Clay Golem, Corpse Explosion at 24. Your army tanks for you." }),
+  LV("lvl-bone-necro", "Teeth → Bone Spear", "Necromancer", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { offhand: T(["Rare necro head"], ["Rare necro head", "Homunculus"], ["Rare necro head"]), weapon: T(["Magic caster weapon"], ["White"], ["White", "Magic caster weapon"]) },
+    notes: "Teeth early, Bone Spear at 18; Bone Prison and Bone Wall keep monsters off you. White wand is a big damage jump." }),
+  LV("lvl-poison-necro", "Poison Dagger → Poison Nova", "Necromancer", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { offhand: T(["Rare necro head"], ["Rare necro head"], ["Rare necro head"]), weapon: T(["Magic caster weapon"], ["Magic caster weapon"], ["Magic caster weapon"]) },
+    notes: "Poison Dagger early, Poison Explosion then Poison Nova at 30. Lower Resist helps a lot in Nightmare/Hell." }),
+  LV("lvl-ce-necro", "Amp + Corpse Explosion", "Necromancer", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { offhand: T(["Rare necro head"], ["Rare necro head"], ["Rare necro head"]), weapon: T(["Magic caster weapon"], ["White", "Magic caster weapon"], ["White"]) },
+    notes: "A few skeletons or a merc make the first kill; Corpse Explosion at 24 chains through packs. Amplify Damage beats physical-resist monsters." }),
+  LV("lvl-fishy-necro", "Fishymancer (Golem + Skeletons)", "Necromancer", LEVEL_MELEE, {
+    caster: false, charms: LEVEL_CHARMS,
+    slots: { offhand: T(["Rare necro head"], ["Rare necro head"], ["Rare necro head"]) },
+    notes: "Fights in melee next to Iron/Blood Golem and skeletons, with Amplify Damage. Very safe; great for Hardcore." }),
+
+  // ===== PALADIN =====
+  LV("lvl-hammer-pal", "Hammerdin", "Paladin", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Steel", "Malice"], ["Spirit (sword)", "Malice"], ["Spirit (sword)", "Heart of the Oak"]), offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Rhyme"], ["Spirit (shield)", "Herald of Zakarum"]) },
+    notes: "Zeal or Holy Bolt early, Blessed Hammer at 18, Concentration at 18. Hammers ignore immunities — a top all-round leveler." }),
+  LV("lvl-zeal-pal", "Zealot", "Paladin", LEVEL_MELEE, {
+    notes: "Sacrifice/Zeal with Might early, Fanaticism at 30. Needs leech or a Prayer merc; upgrade the weapon first." }),
+  LV("lvl-venge-pal", "Vengeance", "Paladin", LEVEL_MELEE, {
+    notes: "Vengeance at 18 adds fire, cold and lightning to each hit — handles most immunes. Run Conviction from 24." }),
+  LV("lvl-holyfire-pal", "Zeal + Holy Fire", "Paladin", LEVEL_MELEE, {
+    notes: "Holy Fire aura burns everything around you while you Zeal — strongest in Normal. Respec around Nightmare." }),
+  LV("lvl-foh-pal", "Holy Bolt → Fist of the Heavens", "Paladin", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { offhand: T(["Ancient's Pledge"], ["Spirit (shield)", "Rhyme"], ["Spirit (shield)", "Herald of Zakarum"]) },
+    notes: "Holy Bolt shreds undead early; Fist of the Heavens at 30 handles everything else. Conviction at 30." }),
+
+  // ===== SORCERESS =====
+  LV("lvl-blizz-sorc", "Frost Nova → Blizzard", "Sorceress", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    notes: "Frost Nova and Ice Blast early, Blizzard at 24. Static Field halves boss health; Teleport at 18 speeds everything up." }),
+  LV("lvl-fire-sorc", "Fire Bolt → Fireball / Meteor", "Sorceress", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Magic caster weapon"], ["Leaf", "Magic caster weapon"], ["Leaf", "Spirit (sword)"]) },
+    notes: "Fire Bolt early, Fireball at 12, Meteor at 24. Leaf staff (Tir Ral) gives +3 to fire skills — best cheap upgrade." }),
+  LV("lvl-light-sorc", "Charged Bolt → Nova / Chain Lightning", "Sorceress", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    notes: "Charged Bolt from 1, Nova at 12, Chain Lightning at 18. Lots of mana — wear Insight on your merc." }),
+  LV("lvl-orb-sorc", "Ice Blast → Frozen Orb", "Sorceress", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    notes: "Ice Bolt / Ice Blast early, Frozen Orb at 30. Glacial Spike freezes packs in between." }),
+  LV("lvl-firewall-sorc", "Fire Wall / Hydra", "Sorceress", LEVEL_CASTER, {
+    caster: true, fcrTarget: 63, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Magic caster weapon"], ["Leaf", "Magic caster weapon"], ["Leaf"]) },
+    notes: "Fire Bolt early, Fire Wall at 18 kills bosses fast, Hydra at 30 for safe damage. Great for Hardcore." }),
+
+  // ===== WARLOCK =====
+  LV("lvl-echo-lock", "Echoing Strike", "Warlock", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare Warlock dagger"], ["Rare Warlock dagger", "Insight"], ["Insight", "Rare Warlock dagger"]) },
+    notes: "Warlock is new — check a current guide. Blade skills early, Echoing Strike once unlocked; it scales with FCR, so Magefist and Spirit help most." }),
+  LV("lvl-fire-lock", "Ring of Fire / Flame Wave", "Warlock", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare Warlock dagger"], ["Rare Warlock dagger", "Spirit (sword)"], ["Spirit (sword)"]) },
+    notes: "Warlock is new — check a current guide. Ring of Fire early, Flame Wave for packs, Apocalypse later. Summon Tainted to tank." }),
+  LV("lvl-miasma-lock", "Miasma Bolt → Miasma Chain", "Warlock", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare Warlock dagger"], ["Rare Warlock dagger", "Spirit (sword)"], ["Spirit (sword)"]) },
+    notes: "Warlock is new — check a current guide. Miasma Bolt early, Miasma Chain for packs, Abyss later. A demon keeps monsters off you." }),
+  LV("lvl-blades-lock", "Mirrored Blades", "Warlock", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare Warlock dagger"], ["Rare Warlock dagger", "Insight"], ["Insight"]) },
+    notes: "Warlock is new — check a current guide. Mirrored Blades for single targets, Blade Warp to move around. Leads into Echoing Strike." }),
+  LV("lvl-demon-lock", "Goatman Summoner", "Warlock", LEVEL_CASTER, {
+    caster: true, fcrTarget: 75, charms: LEVEL_CASTER_CHARMS,
+    slots: { weapon: T(["Rare Warlock dagger"], ["Rare Warlock dagger", "Spirit (sword)"], ["Spirit (sword)"]) },
+    notes: "Warlock is new — check a current guide. Summon Goatman army plus Bind Demon; Death Mark and Blood Oath boost them. Safe for Hardcore." }),
+];
+BUILDS.push(...LEVELING_BUILDS);
 
 // Resolve each build's slot tiers (build overrides on top of its base; null = slot unused).
 for (const b of BUILDS) {
