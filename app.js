@@ -47,7 +47,7 @@
 
   let accounts = loadAccounts();
   let session = null; // { acct, key } while unlocked
-  let state = null;   // decrypted { chars, stash, current } of the unlocked account
+  let state = null;   // decrypted { chars, stashes, current } of the unlocked account
   let tab = "gear";
   let pickedAcct = null;
   let stashType = "helm"; // last gear type used when adding to the stash
@@ -92,14 +92,42 @@
     if (!writeAccounts()) { accounts.pop(); return null; }
     return { acct, key };
   }
+  // Realms with their own shared stash. A character's Mode decides which one it uses.
+  const REALMS = ["Softcore", "Hardcore", "SC Ladder", "HC Ladder"];
+  const REALM_LABEL = { "Softcore": "Non-ladder Softcore", "Hardcore": "Non-ladder Hardcore", "SC Ladder": "Ladder Softcore", "HC Ladder": "Ladder Hardcore" };
+  const realmOf = (c) => (REALMS.includes(c?.mode) ? c.mode : "Softcore");
+  const curRealm = (d) => realmOf((d.chars || []).find((c) => c.id === d.current));
+  function mainRealm(chars) {
+    const n = {};
+    (chars || []).forEach((c) => { const r = realmOf(c); n[r] = (n[r] || 0) + 1; });
+    return REALMS.reduce((best, r) => ((n[r] || 0) > (n[best] || 0) ? r : best), "Softcore");
+  }
+  const allStash = () => REALMS.flatMap((r) => state.stashes[r] || []);
   function normalize(d) {
     d = d || {};
     delete d.tz; // old Terror Zones settings (D2RuneWizard email/token), no longer used
     if (!Array.isArray(d.custom)) d.custom = []; // user-defined items not in the database
     if (!Array.isArray(d.chars)) d.chars = [];
-    if (!Array.isArray(d.stash)) d.stash = [];
-    if (!Array.isArray(d.locRecent)) d.locRecent = []; // stash locations, most recently used first
     if (!d.current && d.chars.length) d.current = d.chars[0].id;
+    // One shared stash per realm, as in the game: Softcore, Hardcore, SC Ladder and HC Ladder
+    // never share items. Older saves had a single stash; it goes to the realm most characters use.
+    if (!d.stashes || typeof d.stashes !== "object") d.stashes = {};
+    const desc = Object.getOwnPropertyDescriptor(d, "stash");
+    if (desc && !desc.get) {
+      if (Array.isArray(d.stash) && d.stash.length) {
+        const r = mainRealm(d.chars);
+        d.stashes[r] = [...(Array.isArray(d.stashes[r]) ? d.stashes[r] : []), ...d.stash];
+      }
+      delete d.stash;
+    }
+    REALMS.forEach((r) => { if (!Array.isArray(d.stashes[r])) d.stashes[r] = []; });
+    // state.stash is the current character's realm stash (not saved itself; d.stashes is).
+    if (!Object.getOwnPropertyDescriptor(d, "stash")) Object.defineProperty(d, "stash", {
+      enumerable: false, configurable: true,
+      get() { return d.stashes[curRealm(d)]; },
+      set(v) { d.stashes[curRealm(d)] = v; },
+    });
+    if (!Array.isArray(d.locRecent)) d.locRecent = []; // stash locations, most recently used first
     return d;
   }
 
@@ -120,7 +148,7 @@
     let changed = false;
     const strip = (en) => { if (en && en.photo) { delete en.photo; changed = true; } };
     state.chars.forEach((c) => { Object.values(c.gear).forEach(strip); c.charms.forEach(strip); });
-    state.stash.forEach(strip);
+    allStash().forEach(strip);
     if (changed) save();
     try {
       const r = indexedDB.open("gearLedger");
@@ -157,7 +185,7 @@
   }
   // Drop custom definitions nothing refers to any more.
   function pruneCustom() {
-    const used = new Set([...state.stash.map((e) => e.item), ...state.chars.flatMap((c) => [...Object.values(c.gear).map((g) => g?.item), ...c.charms.map((x) => x.item)])]);
+    const used = new Set([...allStash().map((e) => e.item), ...state.chars.flatMap((c) => [...Object.values(c.gear).map((g) => g?.item), ...c.charms.map((x) => x.item)])]);
     const before = state.custom.length;
     state.custom = state.custom.filter((ci) => used.has(ci.name));
     if (state.custom.length !== before) registerCustom();
@@ -388,7 +416,7 @@
         <div class="field"><label>Level</label><input type="number" id="fLvl" min="1" max="99" value="${esc(c.level)}"></div>
         <div class="field"><label>Build</label><select id="fBuild">${builds.length ? builds.map((b) => `<option value="${b.id}" ${b.id === c.build ? "selected" : ""}>${esc(b.name)}</option>`).join("") : `<option value="">No guide yet for ${c.cls}</option>`}</select></div>
         <div class="field"><label>Budget target</label><select id="fBudget">${TIER_NAMES.map((n, i) => `<option value="${i}" ${i === Number(c.budget) ? "selected" : ""}>${n}</option>`).join("")}</select></div>
-        <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option ${m === c.mode ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+        <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option value="${m}" ${m === realmOf(c) ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
         ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${stashCount()})`], ["runewords", "Runewords"], ["cube", "Gems & Cube"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
@@ -406,7 +434,7 @@
     $("#fLvl").onchange = (e) => { c.level = Math.max(1, Math.min(99, Number(e.target.value) || 1)); save(); render(); };
     $("#fBuild").onchange = (e) => { c.build = e.target.value; save(); render(); };
     $("#fBudget").onchange = (e) => { c.budget = Number(e.target.value); save(); render(); };
-    $("#fMode").onchange = (e) => { c.mode = e.target.value; save(); };
+    $("#fMode").onchange = (e) => { c.mode = e.target.value; save(); render(); };
     app.querySelectorAll(".tab").forEach((t) => (t.onclick = () => { tab = t.dataset.tab; render(); }));
     ["#scanInput", "#scanCam"].forEach((sel) => {
       const si = $(sel);
@@ -1351,6 +1379,7 @@
             ${entryHTML(e, it, { noteKey: e.id })}
             ${it.slot === "base" ? baseRowHTML(e) : ""}
             <div class="loc-wrap"><label class="loc-field"><span>📍 Location</span><input type="text" class="loc-in" value="${esc(loc)}" placeholder="Shared stash, mule name…" maxlength="60" autocomplete="off" enterkeyhint="done"></label><div class="loc-sugg" role="listbox" aria-label="Recent locations" hidden></div></div>
+            <label class="loc-field realm-move"><span>Move to</span><select class="mv" aria-label="Move to another stash"><option value="">— keep here —</option>${REALMS.filter((r) => r !== realmOf(c)).map((r) => `<option value="${r}">${esc(REALM_LABEL[r])} stash</option>`).join("")}</select></label>
           </div>
           <div class="row-btns">
             ${stackable(e.item) || qtyOf(e) > 1 ? `<div class="qty" aria-label="Quantity"><button class="btn ghost small qminus" aria-label="One fewer">−</button><input class="qn" type="text" inputmode="numeric" pattern="[0-9]*" value="${qtyOf(e)}" aria-label="Quantity — tap to type a total"><button class="btn ghost small qplus" aria-label="One more">+</button></div>` : ""}
@@ -1362,8 +1391,8 @@
     }).join("");
     body.innerHTML = `
       <div class="card">
-        <h3>Shared stash</h3>
-        <p class="notes" style="margin-top:4px">Items here are shared by all your characters. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash. Type where each item is kept (a mule's name, say) in its Location box; Find searches locations too.</p>
+        <h3>Shared stash · ${esc(REALM_LABEL[realmOf(c)])}</h3>
+        <p class="notes" style="margin-top:4px">Items here are shared by your ${esc(realmOf(c))} characters only; each Mode (Softcore, Hardcore, SC Ladder, HC Ladder) has its own stash, as in the game. Change ${esc(c.name)}'s Mode above to switch. Use <b>Move to</b> on an item that's in the wrong stash. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash. Type where each item is kept (a mule's name, say) in its Location box; Find searches locations too.</p>
         <div class="add-row">
           <div class="stack add-pick">
             ${searchHTML("Search any item…")}
@@ -1455,6 +1484,14 @@
     body.querySelectorAll(".charm-row").forEach((row) => {
       const e = state.stash.find((x) => x.id === row.dataset.id);
       $(".rm", row).onclick = () => { state.stash = state.stash.filter((x) => x !== e); pruneCustom(); save(); render(); };
+      const mv = $(".mv", row);
+      if (mv) mv.onchange = () => {
+        const to = mv.value;
+        if (!REALMS.includes(to)) return;
+        state.stash = state.stash.filter((x) => x !== e);
+        state.stashes[to].push(e);
+        save(); render();
+      };
       const qm = $(".qminus", row), qp = $(".qplus", row);
       if (qp) qp.onclick = () => { e.qty = qtyOf(e) + 1; save(); render(); };
       const qn = $("input.qn", row);
