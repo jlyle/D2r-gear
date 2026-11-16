@@ -399,8 +399,3 @@ input.qn:focus { outline: none; border-color: var(--accent); background: rgba(12
 .sock-row input { flex: 1; min-width: 160px; }
 .sock-adds { margin-top: 8px; }
 .sock-extra { display: inline-flex; gap: 6px; align-items: center; margin-top: 8px; }
-
-/* Stash space: personal and shared slot meters, and where each item is kept */
-.stash-meters { margin: 6px 0 0; font-size: 13px; line-height: 1.7; }
-.stash-meters .err { color: var(--bad, #e06c6c); }
-.badge.stash-where { display: inline-block; margin-bottom: 4px; }

@@ -38,11 +38,6 @@
   // Character slots, as in the game: each online realm (SC, HC, SC Ladder, HC Ladder) has its
   // own 24 slots; offline has no limit in the game, so offline characters are capped at 50 in all.
   const ONLINE_SLOTS = 24, OFFLINE_SLOTS = 50;
-  // Stash space, counted in inventory cells (a ring is 1, body armor 6): every character has a
-  // personal stash (100 cells on non-ladder Softcore/Hardcore, 50 on ladder and offline), and
-  // each mode has one 500-cell stash shared by all its characters.
-  const SHARED_CELLS = 500;
-  const personalCells = (realm) => (realm === "Softcore" || realm === "Hardcore" ? 100 : 50);
   const PBKDF2_ITERS = 250000;
   const enc = new TextEncoder(), dec = new TextDecoder();
   const b64 = (buf) => {
@@ -146,13 +141,11 @@
       delete d.stash;
     }
     REALMS.forEach((r) => { if (!Array.isArray(d.stashes[r])) d.stashes[r] = []; });
-    // state.stash is what the current character can reach: its mode's shared stash plus its own
-    // personal stash (entries with .own = character id). Not saved itself; d.stashes is.
-    // Add entries with stashPut(), not state.stash.push() (that array is a fresh copy).
+    // state.stash is the current character's realm stash (not saved itself; d.stashes is).
     if (!Object.getOwnPropertyDescriptor(d, "stash")) Object.defineProperty(d, "stash", {
       enumerable: false, configurable: true,
-      get() { return d.stashes[curRealm(d)].filter((e) => !e.own || e.own === d.current); },
-      set(v) { const r = curRealm(d); d.stashes[r] = [...d.stashes[r].filter((e) => e.own && e.own !== d.current), ...v]; },
+      get() { return d.stashes[curRealm(d)]; },
+      set(v) { d.stashes[curRealm(d)] = v; },
     });
     if (!Array.isArray(d.locRecent)) d.locRecent = []; // stash locations, most recently used first
     return d;
@@ -231,44 +224,17 @@
   const stackable = (name) => STACKABLE.includes(byName.get(name)?.slot);
   const stashCount = () => state.stash.reduce((n, e) => n + qtyOf(e), 0);
   // Add to the stash; a stackable item you already hold (same notes) just goes up by the amount added.
-  // Cells an entry takes in the stash grid (its in-game size times how many).
-  const SLOT_CELLS = { helm: 4, armor: 6, gloves: 4, boots: 4, belt: 2, weapon: 6, offhand: 4 };
-  function cellsOf(e) {
-    const it = byName.get(e.item);
-    const dim = ITEM_SIZES[e.item] || (it && (ITEM_SIZES[it.base] || ITEM_SIZES[it.name]));
-    const one = dim ? dim[0] * dim[1] : it?.slot === "charm" && it.size ? Number(it.size) : SLOT_CELLS[it?.slot] || 1;
-    return one * qtyOf(e);
-  }
-  // Where new stash items go: "shared" or "personal" (the current character's own stash).
-  let stashDest = "shared";
-  const isWhere = (e, where) => (where === "personal") === !!e.own;
-  const capOf = (where) => (where === "personal" ? personalCells(curRealm(state)) : SHARED_CELLS);
-  const stashUsed = (where) => state.stash.filter((e) => isWhere(e, where)).reduce((n, e) => n + cellsOf(e), 0);
-  const whereLabel = (where) => (where === "personal" ? `${cur()?.name || "This character"}'s personal stash` : "the shared stash");
-  function roomOrWarn(where, cells) {
-    const used = stashUsed(where), cap = capOf(where);
-    if (used + cells <= cap) return true;
-    alert(`Not enough room in ${whereLabel(where)}: ${used} of ${cap} slots used and this needs ${cells}. Move or remove something first, or put it in ${whereLabel(where === "personal" ? "shared" : "personal")}.`);
-    return false;
-  }
-  // Put an entry in the current character's personal stash or its mode's shared stash.
-  // Returns its id, or null (after saying why) when there isn't room. force skips the room check.
-  function stashPut(entry, where = stashDest, force = false) {
-    if (!force && !roomOrWarn(where, cellsOf(entry))) return null;
-    if (where === "personal" && state.current) entry.own = state.current; else delete entry.own;
-    state.stashes[curRealm(state)].push(entry);
-    return entry.id;
-  }
-  function addToStash(item, note = "", n = 1, where = stashDest, force = false) {
+  function addToStash(item, note = "", n = 1) {
     n = Math.max(1, Math.floor(Number(n)) || 1);
-    if (!force && !roomOrWarn(where, cellsOf({ item, qty: n }))) return null;
     if (stackable(item)) {
-      const same = state.stash.find((e) => e.item === item && isWhere(e, where) && (e.note || "") === (note || "") && !(e.loc || "").trim());
+      const same = state.stash.find((e) => e.item === item && (e.note || "") === (note || "") && !(e.loc || "").trim());
       if (same) { same.qty = qtyOf(same) + n; same.added = Date.now(); return same.id; }
     }
-    const entry = { id: uid(), added: Date.now(), item, note: note || "" };
+    const id = uid();
+    const entry = { id, added: Date.now(), item, note: note || "" };
     if (n > 1) entry.qty = n;
-    return stashPut(entry, where, true);
+    state.stash.push(entry);
+    return id;
   }
   // Where a stash item is kept (shared stash, a mule's name…), typed by the player.
   const locOf = (e) => (e?.loc || "").trim();
@@ -318,7 +284,7 @@
     const seen = new Map(); let changed = false;
     state.stash = state.stash.filter((e) => {
       if (!stackable(e.item)) return true;
-      const k = e.item + "|" + (e.own || "") + "|" + (e.note || "") + "|" + (e.loc || "").trim().toLowerCase();
+      const k = e.item + "|" + (e.note || "") + "|" + (e.loc || "").trim().toLowerCase();
       const first = seen.get(k);
       if (!first) { seen.set(k, e); return true; }
       first.qty = qtyOf(first) + qtyOf(e); first.added = Math.max(first.added || 0, e.added || 0); changed = true;
@@ -497,15 +463,7 @@
         alert(`${groupLabel(g)} already has ${slotsOf(g)} characters, the most it can hold.`);
         e.target.value = realmOf(c); return;
       }
-      const from = realmOf(c);
-      c.mode = e.target.value;
-      const to = realmOf(c);
-      if (to !== from) { // its personal stash goes with it
-        const mine = state.stashes[from].filter((x) => x.own === c.id);
-        state.stashes[from] = state.stashes[from].filter((x) => x.own !== c.id);
-        state.stashes[to].push(...mine);
-      }
-      save(); render();
+      c.mode = e.target.value; save(); render();
     };
     app.querySelectorAll(".tab").forEach((t) => (t.onclick = () => { tab = t.dataset.tab; render(); }));
     ["#scanInput", "#scanCam"].forEach((sel) => {
@@ -683,7 +641,7 @@
       const fit = fitSlots(incoming, state.chars);
       state.chars.push(...fit);
       const sids = new Set(state.stash.map((s) => s.id));
-      state.stashes[curRealm(state)].push(...(data.stash || []).filter((s) => !sids.has(s.id)).map((s) => { delete s.own; return s; }));
+      state.stash.push(...(data.stash || []).filter((s) => !sids.has(s.id)));
       state.current = state.current || state.chars[0]?.id || null;
       save(); render();
       if (fit.length < incoming.length) alert(`Only ${fit.length} of ${incoming.length} character${incoming.length === 1 ? "" : "s"} fit (limit ${SLOT_RULE}).`);
@@ -1106,7 +1064,6 @@
   function equipFromStash(c, entry, slotKey) {
     const it = byName.get(entry.item);
     if (!it) return;
-    const where = entry.own ? "personal" : "shared"; // the swapped-out item goes back where this came from
     if (qtyOf(entry) > 1) entry.qty = qtyOf(entry) - 1;
     else state.stash = state.stash.filter((x) => x !== entry);
     if (it.slot === "charm") {
@@ -1114,8 +1071,8 @@
     } else {
       const old = c.gear[slotKey];
       if (old?.item) {
-        if (old.sock || old.fill) stashPut({ ...old, id: uid(), added: Date.now() }, where, true);
-        else addToStash(old.item, old.note || "", 1, where, true);
+        if (old.sock || old.fill) state.stash.push({ ...old, id: uid(), added: Date.now() });
+        else addToStash(old.item, old.note || "");
       }
       const moved = { item: it.name, note: entry.note || "" };
       for (const k of ["sock", "fill", "eth", "sockExtra"]) if (entry[k] !== undefined) moved[k] = entry[k];
@@ -1446,16 +1403,15 @@
         const u = ups.get(e.id);
         const target = u ? u.slotKey : slotsFor(c, it)[0]?.key;
         const canEquip = it.slot === "charm" || target;
-        const hay = [e.item, it.alias, it.runes, it.base, e.note, SLOT_LABELS[g], e.own ? "personal" : "shared", it.slot === "base" ? `${e.sock || 0}os ${e.sock || 0} socket ${e.eth ? "eth ethereal" : ""}` : ""].filter(Boolean).join(" ").toLowerCase();
+        const hay = [e.item, it.alias, it.runes, it.base, e.note, SLOT_LABELS[g], it.slot === "base" ? `${e.sock || 0}os ${e.sock || 0} socket ${e.eth ? "eth ethereal" : ""}` : ""].filter(Boolean).join(" ").toLowerCase();
         const loc = locOf(e);
         return `<div class="charm-row ${e.id === flashId ? "flash" : ""}" data-id="${e.id}" data-hay="${esc(hay)}" data-find="${esc((hay + " " + loc).toLowerCase())}">
           <div>
             ${u ? `<div class="ok up-flag">▲ Upgrade for ${esc(c.name)}: ${esc(u.label)} — ${esc(u.why)}</div>` : ""}
-            <span class="badge stash-where">${e.own ? "🎒 Personal" : "📦 Shared"} · ${cellsOf(e)} slot${cellsOf(e) === 1 ? "" : "s"}</span>
             ${entryHTML(e, it, { noteKey: e.id })}
             ${it.slot === "base" ? baseRowHTML(e) : ""}
             <div class="loc-wrap"><label class="loc-field"><span>📍 Location</span><input type="text" class="loc-in" value="${esc(loc)}" placeholder="Shared stash, mule name…" maxlength="60" autocomplete="off" enterkeyhint="done"></label><div class="loc-sugg" role="listbox" aria-label="Recent locations" hidden></div></div>
-            <label class="loc-field realm-move"><span>Move to</span><select class="mv" aria-label="Move to another stash"><option value="">— keep here —</option>${e.own ? `<option value="@shared">Shared stash</option>` : `<option value="@personal">${esc(c.name)}'s personal stash</option>`}${REALMS.filter((r) => r !== realmOf(c)).map((r) => `<option value="${r}">${esc(REALM_LABEL[r])} shared stash</option>`).join("")}</select></label>
+            <label class="loc-field realm-move"><span>Move to</span><select class="mv" aria-label="Move to another stash"><option value="">— keep here —</option>${REALMS.filter((r) => r !== realmOf(c)).map((r) => `<option value="${r}">${esc(REALM_LABEL[r])} stash</option>`).join("")}</select></label>
           </div>
           <div class="row-btns">
             ${stackable(e.item) || qtyOf(e) > 1 ? `<div class="qty" aria-label="Quantity"><button class="btn ghost small qminus" aria-label="One fewer">−</button><input class="qn" type="text" inputmode="numeric" pattern="[0-9]*" value="${qtyOf(e)}" aria-label="Quantity — tap to type a total"><button class="btn ghost small qplus" aria-label="One more">+</button></div>` : ""}
@@ -1467,9 +1423,8 @@
     }).join("");
     body.innerHTML = `
       <div class="card">
-        <h3>Stash · ${esc(REALM_LABEL[realmOf(c)])}</h3>
-        ${(() => { const m = (w) => { const u = stashUsed(w), cap = capOf(w); return `<span class="${u > cap ? "err" : ""}">${w === "personal" ? `🎒 ${esc(c.name)}'s personal` : "📦 Shared"}: <b>${u}</b> / ${cap} slots${u > cap ? " — over the limit" : ""}</span>`; }; return `<p class="stash-meters">${m("personal")}<br>${m("shared")}</p>`; })()}
-        <p class="notes" style="margin-top:4px">${esc(c.name)} has a personal stash only it can use, and shares the ${SHARED_CELLS}-slot stash with your other ${esc(realmOf(c))} characters. Each Mode (Softcore, Hardcore, SC Ladder, HC Ladder, Offline SC, Offline HC) has its own, as in the game. Slots count the item's real size (a ring is 1, body armor 6). Use <b>Move to</b> to shift an item between stashes. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash. Type where each item is kept (a mule's name, say) in its Location box; Find searches locations too.</p>
+        <h3>Shared stash · ${esc(REALM_LABEL[realmOf(c)])}</h3>
+        <p class="notes" style="margin-top:4px">Items here are shared by your ${esc(realmOf(c))} characters only; each Mode (Softcore, Hardcore, SC Ladder, HC Ladder, Offline SC, Offline HC) has its own stash, as in the game. Change ${esc(c.name)}'s Mode above to switch. Use <b>Move to</b> on an item that's in the wrong stash. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash. Type where each item is kept (a mule's name, say) in its Location box; Find searches locations too.</p>
         <div class="add-row">
           <div class="stack add-pick">
             ${searchHTML("Search any item…")}
@@ -1479,7 +1434,6 @@
               <label class="field"><span>Sockets</span><select id="addSock"></select></label>
               <label class="check eth-check"><input type="checkbox" id="addEth"> Ethereal</label>
             </div>
-            <label class="field"><span>Put in</span><select id="addWhere"><option value="shared" ${stashDest === "shared" ? "selected" : ""}>Shared stash</option><option value="personal" ${stashDest === "personal" ? "selected" : ""}>${esc(c.name)}'s personal stash</option></select></label>
             <div class="field"><span>Qty</span><div class="qty add-qty"><button type="button" class="btn ghost small" id="addQtyMinus" aria-label="One fewer">−</button><input class="qn" id="addQty" type="text" inputmode="numeric" pattern="[0-9]*" value="1" aria-label="Quantity to add — tap to type a number"><button type="button" class="btn ghost small" id="addQtyPlus" aria-label="One more">+</button></div></div>
           </div>
           <button class="btn" id="addStashBtn">Add</button>
@@ -1533,16 +1487,15 @@
       sockOpts();
       $("#addStashBtn").focus();
     });
-    $("#addWhere").onchange = (ev) => { stashDest = ev.target.value === "personal" ? "personal" : "shared"; };
     const addQty = wireQtyInput($("#addQty"), (n, how) => { if (how === "enter") $("#addStashBtn").click(); });
     $("#addQtyMinus").onclick = () => addQty.step(-1);
     $("#addQtyPlus").onclick = () => addQty.step(1);
     $("#addStashBtn").onclick = () => {
       if (stashType === "base") {
         // Each base is its own row (sockets and ethereal differ), so add them one at a time.
-        if (!roomOrWarn(stashDest, cellsOf({ item: $("#addStash").value, qty: addQty.value() }))) return;
         for (let k = 0; k < addQty.value(); k++) {
-          flashId = stashPut({ id: uid(), added: Date.now(), item: $("#addStash").value, note: "", sock: Number($("#addSock").value) || 0, eth: $("#addEth").checked || undefined }, stashDest, true);
+          const id = uid(); flashId = id;
+          state.stash.push({ id, added: Date.now(), item: $("#addStash").value, note: "", sock: Number($("#addSock").value) || 0, eth: $("#addEth").checked || undefined });
         }
       } else flashId = addToStash($("#addStash").value, "", addQty.value());
       save(); render();
@@ -1555,9 +1508,8 @@
       const slot = $("#cuSlot").value;
       if (!existing) state.custom.push({ name, slot, type: $("#cuType").value, stats: "" });
       registerCustom();
-      const nid = stashPut({ id: uid(), added: Date.now(), item: name, note: $("#cuStats").value.trim() });
-      if (!nid) { pruneCustom(); return; }
-      flashId = nid;
+      const nid = uid(); flashId = nid;
+      state.stash.push({ id: nid, added: Date.now(), item: name, note: $("#cuStats").value.trim() });
       stashType = slot;
       save(); render();
     };
@@ -1567,17 +1519,8 @@
       const mv = $(".mv", row);
       if (mv) mv.onchange = () => {
         const to = mv.value;
-        if (to === "@shared" || to === "@personal") {
-          const where = to.slice(1);
-          if (!roomOrWarn(where, cellsOf(e))) { mv.value = ""; return; }
-          if (where === "personal") e.own = c.id; else delete e.own;
-          save(); render(); return;
-        }
         if (!REALMS.includes(to)) return;
-        const used = state.stashes[to].filter((x) => !x.own).reduce((n, x) => n + cellsOf(x), 0);
-        if (used + cellsOf(e) > SHARED_CELLS) { alert(`Not enough room in the ${REALM_LABEL[to]} shared stash: ${used} of ${SHARED_CELLS} slots used and this needs ${cellsOf(e)}.`); mv.value = ""; return; }
         state.stash = state.stash.filter((x) => x !== e);
-        delete e.own;
         state.stashes[to].push(e);
         save(); render();
       };
@@ -2222,7 +2165,7 @@
     else if (r.dest === "charms") c.charms.push({ id: uid(), added: Date.now(), ...entry });
     else {
       const old = c.gear[r.dest];
-      if (old?.item && r.move) addToStash(old.item, old.note || "", 1, stashDest, true);
+      if (old?.item && r.move) addToStash(old.item, old.note || "");
       c.gear[r.dest] = entry;
     }
     save();
@@ -2255,9 +2198,7 @@
   $("#newChar").onclick = newChar;
   $("#deleteChar").onclick = () => {
     const c = cur();
-    const own = c ? state.stashes[realmOf(c)].filter((x) => x.own === c.id).length : 0;
-    if (!c || !confirm(`Delete ${c.name}?${own ? ` Its personal stash (${own} item${own === 1 ? "" : "s"}) goes too.` : ""} This can't be undone.`)) return;
-    state.stashes[realmOf(c)] = state.stashes[realmOf(c)].filter((x) => x.own !== c.id);
+    if (!c || !confirm(`Delete ${c.name}? This can't be undone.`)) return;
     state.chars = state.chars.filter((x) => x !== c);
     state.current = state.chars[0]?.id || null;
     save(); render();
