@@ -7,7 +7,7 @@ Track Diablo II: Resurrected characters' equipped gear, mercenary, and charm inv
 ![Gear tab: each slot shows the item, its typical stats and your actual rolls, with a tier badge for your build](screenshots/gear.png)
 
 ## Features
-- Password-protected accounts, each with up to 10 characters and its own shared stash. Data is encrypted (AES-GCM, PBKDF2 key) and stored in the browser only; a forgotten password can't be recovered.
+- Password-protected accounts, each with up to 24 softcore and 24 hardcore characters (as on Battle.net) and a shared stash per mode. Data is encrypted (AES-GCM, PBKDF2 key) and stored in the browser only; a forgotten password can't be recovered.
 - Export an encrypted backup of a whole account (all characters, gear, stats and stash) and restore it on any device. See **Back up and restore your data** below.
 - Slot-by-slot gear picker with uniques, sets, runewords and common rare/crafted types, plus item search (name, nickname or rune recipe)
 - Mercenary tab: pick the merc type (Act 1 Rogue, Act 2 Desert Mercenary, Act 3 Iron Wolf, Act 5 Barbarian) and its aura, element or skills, plus its level and a name. Slots and item lists follow the type: bows for Act 1; polearms, spears and javelins for Act 2; a one-handed sword and a shield for Act 3; one sword (Bash) or two (Frenzy) for Act 5. Items it can't use are flagged, items above its level are marked, and Upgrades suggestions stay at or below its level. A merc stats card totals resists from gear, auras from gear (e.g. Insight's Meditation), life leech, crushing blow, IAS and more.
@@ -75,7 +75,7 @@ Each recipe is counted on its own, so two recipes that need the same gem can bot
 **⚠️ Your characters exist only in this browser on this device.** Nothing is sent to a server, so there's no cloud copy and no account recovery. If you clear your browser data, uninstall the browser, use a private window, switch phones, or forget your password, the data is gone unless you have a backup. **Export a backup regularly**, and always before you clear site data or change devices.
 
 ### What a backup contains
-- One file covers **one whole account**: all its characters (up to 10), each character's gear, mercenary, charms, build and actual stats, plus the account's shared stash and custom items.
+- One file covers **one whole account**: all its characters (up to 24 softcore and 24 hardcore), each character's gear, mercenary, charms, build and actual stats, plus the account's shared stash and custom items.
 - It does **not** contain any photos, because photos are never kept.
 - The file stays **encrypted** with the account's password (AES-GCM, PBKDF2-SHA-256 key). It's safe to keep in cloud storage or email to yourself, but without the password nobody can open it, including you.
 - If you have several accounts (e.g. Ladder and Hardcore), export each one separately.

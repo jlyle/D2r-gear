@@ -35,7 +35,9 @@
   // Each account: { id, name, salt, iv, data } — data is AES-GCM ciphertext of
   // { chars, stash, current }, keyed by PBKDF2 of the account password.
   const ACCTS_KEY = "gearLedger.accounts.v2";
-  const MAX_CHARS = 10;
+  // As on Battle.net: 24 softcore and 24 hardcore characters (ladder counts toward its core).
+  const MAX_PER_CORE = 24;
+  const MAX_CHARS = MAX_PER_CORE * 2;
   const PBKDF2_ITERS = 250000;
   const enc = new TextEncoder(), dec = new TextDecoder();
   const b64 = (buf) => {
@@ -101,6 +103,13 @@
     const n = {};
     (chars || []).forEach((c) => { const r = realmOf(c); n[r] = (n[r] || 0) + 1; });
     return REALMS.reduce((best, r) => ((n[r] || 0) > (n[best] || 0) ? r : best), "Softcore");
+  }
+  const isHC = (c) => /^(Hardcore|HC Ladder)$/.test(realmOf(c));
+  const coreCount = (chars, hc) => chars.filter((c) => isHC(c) === hc).length;
+  // Keep at most 24 softcore and 24 hardcore characters, in order.
+  function fitCores(chars, existing = []) {
+    const n = { true: coreCount(existing, true), false: coreCount(existing, false) };
+    return chars.filter((c) => { const k = isHC(c); if (n[k] >= MAX_PER_CORE) return false; n[k]++; return true; });
   }
   const allStash = () => REALMS.flatMap((r) => state.stashes[r] || []);
   function normalize(d) {
@@ -283,10 +292,11 @@
   const buildOf = (c) => BUILDS.find((b) => b.id === c.build) || null;
 
   function newChar() {
-    if (state.chars.length >= MAX_CHARS) { alert(`An account holds up to ${MAX_CHARS} characters. Delete one or use another account.`); return; }
-    const name = prompt("Character name?", "New hero");
+    const scFull = coreCount(state.chars, false) >= MAX_PER_CORE, hcFull = coreCount(state.chars, true) >= MAX_PER_CORE;
+    if (scFull && hcFull) { alert(`An account holds up to ${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore characters. Delete one or use another account.`); return; }
+    const name = prompt(scFull ? `Softcore is full (${MAX_PER_CORE}), so this will be a Hardcore character. Character name?` : "Character name?", "New hero");
     if (name === null) return;
-    const c = { id: uid(), name: name.trim() || "New hero", cls: "Sorceress", level: 1, build: "blizz-sorc", budget: 1, mode: "Softcore", extraFcr: 0, gear: {}, charms: [] };
+    const c = { id: uid(), name: name.trim() || "New hero", cls: "Sorceress", level: 1, build: "blizz-sorc", budget: 1, mode: scFull ? "Hardcore" : "Softcore", extraFcr: 0, gear: {}, charms: [] };
     state.chars.push(c);
     state.current = c.id;
     save(); render();
@@ -434,7 +444,14 @@
     $("#fLvl").onchange = (e) => { c.level = Math.max(1, Math.min(99, Number(e.target.value) || 1)); save(); render(); };
     $("#fBuild").onchange = (e) => { c.build = e.target.value; save(); render(); };
     $("#fBudget").onchange = (e) => { c.budget = Number(e.target.value); save(); render(); };
-    $("#fMode").onchange = (e) => { c.mode = e.target.value; save(); render(); };
+    $("#fMode").onchange = (e) => {
+      const toHC = /^(Hardcore|HC Ladder)$/.test(e.target.value);
+      if (toHC !== isHC(c) && coreCount(state.chars, toHC) >= MAX_PER_CORE) {
+        alert(`You already have ${MAX_PER_CORE} ${toHC ? "hardcore" : "softcore"} characters, the most an account can hold.`);
+        e.target.value = realmOf(c); return;
+      }
+      c.mode = e.target.value; save(); render();
+    };
     app.querySelectorAll(".tab").forEach((t) => (t.onclick = () => { tab = t.dataset.tab; render(); }));
     ["#scanInput", "#scanCam"].forEach((sel) => {
       const si = $(sel);
@@ -462,7 +479,7 @@
       ? state.chars.map((c) => `<option value="${c.id}" ${c.id === state.current ? "selected" : ""}>${esc(c.name)} — ${esc(c.cls)} ${esc(c.level)}</option>`).join("")
       : `<option>No characters</option>`;
     sel.disabled = !state.chars.length;
-    $("#acctName").textContent = `${session.acct.name} · ${state.chars.length}/${MAX_CHARS}`;
+    $("#acctName").textContent = `${session.acct.name} · SC ${coreCount(state.chars, false)}/${MAX_PER_CORE} · HC ${coreCount(state.chars, true)}/${MAX_PER_CORE}`;
     $("#newChar").disabled = state.chars.length >= MAX_CHARS;
   }
 
@@ -518,7 +535,7 @@
         </section>` : ""}
         <section class="card">
           <h2>${accounts.length ? "New account" : "Create your first account"}</h2>
-          <p class="notes">Each account holds up to ${MAX_CHARS} characters and its own shared stash, locked with its password on this device. <b>A forgotten password can't be recovered.</b></p>
+          <p class="notes">Each account holds up to ${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore characters, with a shared stash for each mode, locked with its password on this device. <b>A forgotten password can't be recovered.</b></p>
           <form id="createForm" class="stack">
             <label class="field"><span>Account name</span><input type="text" id="newName" placeholder="e.g. Main, Ladder, Hardcore" required maxlength="40"></label>
             <label class="field"><span>Password</span><input type="password" id="newPw" autocomplete="new-password" required minlength="4"></label>
@@ -571,7 +588,8 @@
       if (accounts.some((a) => a.name.toLowerCase() === name.toLowerCase())) { errEl.textContent = "There's already an account with that name."; return; }
       const move = $("#moveLegacy")?.checked;
       let data = normalize(move ? legacy : null);
-      if (data.chars.length > MAX_CHARS) { errEl.textContent = `You have ${data.chars.length} existing characters; only the first ${MAX_CHARS} will be moved.`; data.chars = data.chars.slice(0, MAX_CHARS); }
+      const fit = fitCores(data.chars);
+      if (fit.length < data.chars.length) { errEl.textContent = `You have ${data.chars.length} existing characters; only ${fit.length} fit (${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore).`; data.chars = fit; }
       const s = await createAccount(name, pw, data);
       if (!s) return;
       if (move) { try { localStorage.removeItem(STORE_KEY); } catch (err) { /* ignore */ } }
@@ -606,13 +624,13 @@
       if (!session) { alert("That's an older single-list backup. Unlock or create an account first, then import it from the ⋯ menu."); return; }
       const ids = new Set(state.chars.map((c) => c.id));
       const incoming = data.chars.filter((c) => !ids.has(c.id));
-      const room = MAX_CHARS - state.chars.length;
-      state.chars.push(...incoming.slice(0, room));
+      const fit = fitCores(incoming, state.chars);
+      state.chars.push(...fit);
       const sids = new Set(state.stash.map((s) => s.id));
       state.stash.push(...(data.stash || []).filter((s) => !sids.has(s.id)));
       state.current = state.current || state.chars[0]?.id || null;
       save(); render();
-      if (incoming.length > room) alert(`Only ${room} character${room === 1 ? "" : "s"} fit (limit ${MAX_CHARS} per account).`);
+      if (fit.length < incoming.length) alert(`Only ${fit.length} of ${incoming.length} character${incoming.length === 1 ? "" : "s"} fit (limit ${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore per account).`);
       return;
     }
     alert("That file isn't a Perfect Roll backup.");
