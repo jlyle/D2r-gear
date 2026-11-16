@@ -35,9 +35,9 @@
   // Each account: { id, name, salt, iv, data } — data is AES-GCM ciphertext of
   // { chars, stash, current }, keyed by PBKDF2 of the account password.
   const ACCTS_KEY = "gearLedger.accounts.v2";
-  // As on Battle.net: 24 softcore and 24 hardcore characters (ladder counts toward its core).
-  const MAX_PER_CORE = 24;
-  const MAX_CHARS = MAX_PER_CORE * 2;
+  // Character slots, as in the game: each online realm (SC, HC, SC Ladder, HC Ladder) has its
+  // own 24 slots; offline has no limit in the game, so offline characters are capped at 50 in all.
+  const ONLINE_SLOTS = 24, OFFLINE_SLOTS = 50;
   const PBKDF2_ITERS = 250000;
   const enc = new TextEncoder(), dec = new TextDecoder();
   const b64 = (buf) => {
@@ -95,8 +95,8 @@
     return { acct, key };
   }
   // Realms with their own shared stash. A character's Mode decides which one it uses.
-  const REALMS = ["Softcore", "Hardcore", "SC Ladder", "HC Ladder"];
-  const REALM_LABEL = { "Softcore": "Non-ladder Softcore", "Hardcore": "Non-ladder Hardcore", "SC Ladder": "Ladder Softcore", "HC Ladder": "Ladder Hardcore" };
+  const REALMS = ["Softcore", "Hardcore", "SC Ladder", "HC Ladder", "Offline SC", "Offline HC"];
+  const REALM_LABEL = { "Softcore": "Non-ladder Softcore", "Hardcore": "Non-ladder Hardcore", "SC Ladder": "Ladder Softcore", "HC Ladder": "Ladder Hardcore", "Offline SC": "Offline Softcore", "Offline HC": "Offline Hardcore" };
   const realmOf = (c) => (REALMS.includes(c?.mode) ? c.mode : "Softcore");
   const curRealm = (d) => realmOf((d.chars || []).find((c) => c.id === d.current));
   function mainRealm(chars) {
@@ -104,12 +104,23 @@
     (chars || []).forEach((c) => { const r = realmOf(c); n[r] = (n[r] || 0) + 1; });
     return REALMS.reduce((best, r) => ((n[r] || 0) > (n[best] || 0) ? r : best), "Softcore");
   }
-  const isHC = (c) => /^(Hardcore|HC Ladder)$/.test(realmOf(c));
-  const coreCount = (chars, hc) => chars.filter((c) => isHC(c) === hc).length;
-  // Keep at most 24 softcore and 24 hardcore characters, in order.
-  function fitCores(chars, existing = []) {
-    const n = { true: coreCount(existing, true), false: coreCount(existing, false) };
-    return chars.filter((c) => { const k = isHC(c); if (n[k] >= MAX_PER_CORE) return false; n[k]++; return true; });
+  // Slot group: each online realm on its own; both offline modes share one group.
+  const groupOfMode = (m) => (/^Offline/.test(m) ? "Offline" : (REALMS.includes(m) ? m : "Softcore"));
+  const groupOf = (c) => groupOfMode(realmOf(c));
+  const slotsOf = (g) => (g === "Offline" ? OFFLINE_SLOTS : ONLINE_SLOTS);
+  const groupLabel = (g) => (g === "Offline" ? "Offline" : REALM_LABEL[g]);
+  const groupCount = (chars, g) => chars.filter((c) => groupOf(c) === g).length;
+  const groupFull = (chars, g) => groupCount(chars, g) >= slotsOf(g);
+  const SLOT_RULE = `${ONLINE_SLOTS} characters in each online mode (Softcore, Hardcore, SC Ladder, HC Ladder) and ${OFFLINE_SLOTS} offline`;
+  // Keep only the characters that fit their mode's slots, in order.
+  function fitSlots(chars, existing = []) {
+    const n = {};
+    return chars.filter((c) => {
+      const g = groupOf(c);
+      if (n[g] === undefined) n[g] = groupCount(existing, g);
+      if (n[g] >= slotsOf(g)) return false;
+      n[g]++; return true;
+    });
   }
   const allStash = () => REALMS.flatMap((r) => state.stashes[r] || []);
   function normalize(d) {
@@ -292,11 +303,13 @@
   const buildOf = (c) => BUILDS.find((b) => b.id === c.build) || null;
 
   function newChar() {
-    const scFull = coreCount(state.chars, false) >= MAX_PER_CORE, hcFull = coreCount(state.chars, true) >= MAX_PER_CORE;
-    if (scFull && hcFull) { alert(`An account holds up to ${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore characters. Delete one or use another account.`); return; }
-    const name = prompt(scFull ? `Softcore is full (${MAX_PER_CORE}), so this will be a Hardcore character. Character name?` : "Character name?", "New hero");
+    // New characters start in the current character's mode, or the first mode with a free slot.
+    const want = realmOf(cur());
+    const mode = [want, ...REALMS].find((m) => !groupFull(state.chars, groupOfMode(m)));
+    if (!mode) { alert(`Every mode is full (${SLOT_RULE}). Delete a character or use another account.`); return; }
+    const name = prompt(mode !== want ? `${groupLabel(groupOfMode(want))} is full, so this will be a ${REALM_LABEL[mode]} character. Character name?` : `New ${REALM_LABEL[mode]} character. Name?`, "New hero");
     if (name === null) return;
-    const c = { id: uid(), name: name.trim() || "New hero", cls: "Sorceress", level: 1, build: "blizz-sorc", budget: 1, mode: scFull ? "Hardcore" : "Softcore", extraFcr: 0, gear: {}, charms: [] };
+    const c = { id: uid(), name: name.trim() || "New hero", cls: "Sorceress", level: 1, build: "blizz-sorc", budget: 1, mode, extraFcr: 0, gear: {}, charms: [] };
     state.chars.push(c);
     state.current = c.id;
     save(); render();
@@ -426,7 +439,7 @@
         <div class="field"><label>Level</label><input type="number" id="fLvl" min="1" max="99" value="${esc(c.level)}"></div>
         <div class="field"><label>Build</label><select id="fBuild">${builds.length ? builds.map((b) => `<option value="${b.id}" ${b.id === c.build ? "selected" : ""}>${esc(b.name)}</option>`).join("") : `<option value="">No guide yet for ${c.cls}</option>`}</select></div>
         <div class="field"><label>Budget target</label><select id="fBudget">${TIER_NAMES.map((n, i) => `<option value="${i}" ${i === Number(c.budget) ? "selected" : ""}>${n}</option>`).join("")}</select></div>
-        <div class="field"><label>Mode</label><select id="fMode">${["Softcore", "Hardcore", "SC Ladder", "HC Ladder"].map((m) => `<option value="${m}" ${m === realmOf(c) ? "selected" : ""}>${m}</option>`).join("")}</select></div>
+        <div class="field"><label>Mode</label><select id="fMode">${REALMS.map((m) => `<option value="${m}" ${m === realmOf(c) ? "selected" : ""}>${m}</option>`).join("")}</select></div>
       </section>
       <nav class="tabs" role="tablist">
         ${[["gear", "Gear"], ["merc", "Mercenary"], ["charms", "Charms"], ["stash", `Stash (${stashCount()})`], ["runewords", "Runewords"], ["cube", "Gems & Cube"], ["skills", "Skills"], ["upgrades", "Upgrades"]].map(([k, l]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${tab === k}">${l}</button>`).join("")}
@@ -445,9 +458,9 @@
     $("#fBuild").onchange = (e) => { c.build = e.target.value; save(); render(); };
     $("#fBudget").onchange = (e) => { c.budget = Number(e.target.value); save(); render(); };
     $("#fMode").onchange = (e) => {
-      const toHC = /^(Hardcore|HC Ladder)$/.test(e.target.value);
-      if (toHC !== isHC(c) && coreCount(state.chars, toHC) >= MAX_PER_CORE) {
-        alert(`You already have ${MAX_PER_CORE} ${toHC ? "hardcore" : "softcore"} characters, the most an account can hold.`);
+      const g = groupOfMode(e.target.value);
+      if (g !== groupOf(c) && groupFull(state.chars, g)) {
+        alert(`${groupLabel(g)} already has ${slotsOf(g)} characters, the most it can hold.`);
         e.target.value = realmOf(c); return;
       }
       c.mode = e.target.value; save(); render();
@@ -479,8 +492,9 @@
       ? state.chars.map((c) => `<option value="${c.id}" ${c.id === state.current ? "selected" : ""}>${esc(c.name)} — ${esc(c.cls)} ${esc(c.level)}</option>`).join("")
       : `<option>No characters</option>`;
     sel.disabled = !state.chars.length;
-    $("#acctName").textContent = `${session.acct.name} · SC ${coreCount(state.chars, false)}/${MAX_PER_CORE} · HC ${coreCount(state.chars, true)}/${MAX_PER_CORE}`;
-    $("#newChar").disabled = state.chars.length >= MAX_CHARS;
+    const g = groupOf(cur());
+    $("#acctName").textContent = `${session.acct.name} · ${groupLabel(g)} ${groupCount(state.chars, g)}/${slotsOf(g)}`;
+    $("#newChar").disabled = REALMS.every((m) => groupFull(state.chars, groupOfMode(m)));
   }
 
   // ---------- README shown on the landing page ----------
@@ -535,7 +549,7 @@
         </section>` : ""}
         <section class="card">
           <h2>${accounts.length ? "New account" : "Create your first account"}</h2>
-          <p class="notes">Each account holds up to ${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore characters, with a shared stash for each mode, locked with its password on this device. <b>A forgotten password can't be recovered.</b></p>
+          <p class="notes">Each account holds up to ${SLOT_RULE}, with a separate shared stash for each mode, locked with its password on this device. <b>A forgotten password can't be recovered.</b></p>
           <form id="createForm" class="stack">
             <label class="field"><span>Account name</span><input type="text" id="newName" placeholder="e.g. Main, Ladder, Hardcore" required maxlength="40"></label>
             <label class="field"><span>Password</span><input type="password" id="newPw" autocomplete="new-password" required minlength="4"></label>
@@ -588,8 +602,8 @@
       if (accounts.some((a) => a.name.toLowerCase() === name.toLowerCase())) { errEl.textContent = "There's already an account with that name."; return; }
       const move = $("#moveLegacy")?.checked;
       let data = normalize(move ? legacy : null);
-      const fit = fitCores(data.chars);
-      if (fit.length < data.chars.length) { errEl.textContent = `You have ${data.chars.length} existing characters; only ${fit.length} fit (${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore).`; data.chars = fit; }
+      const fit = fitSlots(data.chars);
+      if (fit.length < data.chars.length) { errEl.textContent = `You have ${data.chars.length} existing characters; only ${fit.length} fit (${SLOT_RULE}).`; data.chars = fit; }
       const s = await createAccount(name, pw, data);
       if (!s) return;
       if (move) { try { localStorage.removeItem(STORE_KEY); } catch (err) { /* ignore */ } }
@@ -624,13 +638,13 @@
       if (!session) { alert("That's an older single-list backup. Unlock or create an account first, then import it from the ⋯ menu."); return; }
       const ids = new Set(state.chars.map((c) => c.id));
       const incoming = data.chars.filter((c) => !ids.has(c.id));
-      const fit = fitCores(incoming, state.chars);
+      const fit = fitSlots(incoming, state.chars);
       state.chars.push(...fit);
       const sids = new Set(state.stash.map((s) => s.id));
       state.stash.push(...(data.stash || []).filter((s) => !sids.has(s.id)));
       state.current = state.current || state.chars[0]?.id || null;
       save(); render();
-      if (fit.length < incoming.length) alert(`Only ${fit.length} of ${incoming.length} character${incoming.length === 1 ? "" : "s"} fit (limit ${MAX_PER_CORE} softcore and ${MAX_PER_CORE} hardcore per account).`);
+      if (fit.length < incoming.length) alert(`Only ${fit.length} of ${incoming.length} character${incoming.length === 1 ? "" : "s"} fit (limit ${SLOT_RULE}).`);
       return;
     }
     alert("That file isn't a Perfect Roll backup.");
@@ -1410,7 +1424,7 @@
     body.innerHTML = `
       <div class="card">
         <h3>Shared stash · ${esc(REALM_LABEL[realmOf(c)])}</h3>
-        <p class="notes" style="margin-top:4px">Items here are shared by your ${esc(realmOf(c))} characters only; each Mode (Softcore, Hardcore, SC Ladder, HC Ladder) has its own stash, as in the game. Change ${esc(c.name)}'s Mode above to switch. Use <b>Move to</b> on an item that's in the wrong stash. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash. Type where each item is kept (a mule's name, say) in its Location box; Find searches locations too.</p>
+        <p class="notes" style="margin-top:4px">Items here are shared by your ${esc(realmOf(c))} characters only; each Mode (Softcore, Hardcore, SC Ladder, HC Ladder, Offline SC, Offline HC) has its own stash, as in the game. Change ${esc(c.name)}'s Mode above to switch. Use <b>Move to</b> on an item that's in the wrong stash. Upgrades for ${esc(c.name)} are flagged, and the Upgrades tab checks them first. Equip swaps the worn item back into the stash. Type where each item is kept (a mule's name, say) in its Location box; Find searches locations too.</p>
         <div class="add-row">
           <div class="stack add-pick">
             ${searchHTML("Search any item…")}
