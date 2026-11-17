@@ -65,15 +65,18 @@
 <h2>Characters and gear</h2>
 <p>Use one of your real characters if you can; real gear finds more problems than made-up gear.</p>
 <ul class="checks">
-<li><label><input type="checkbox" data-k="c7"> <span>Add a character with <b>+ New</b>. Set its class, level and build. The build list shows builds for that class.</span></label></li>
+<li><label><input type="checkbox" data-k="c7"> <span>Add a character with <b>+ New</b>. Set its class, level, <b>Mode</b> and build. The build list shows that class's builds in two groups: <b>Endgame builds</b> and <b>Leveling builds</b>.</span></label></li>
+<li><label><input type="checkbox" data-k="c45"> <span>Set a character's <b>Mode</b> (Softcore, Hardcore, SC Ladder, HC Ladder, Offline SC or Offline HC). The top of the screen shows how many characters that mode has, for example "Ladder Softcore 1/24".</span></label></li>
+<li><label><input type="checkbox" data-k="c46"> <span>Pick a <b>Leveling build</b> and set the level to 20. <b>Gear stage</b> shows "Lvl 1–30 (from level)" and can't be changed by hand. Set the level to 45, then 65: the stage moves to 30–60, then 60+, and <b>Upgrades</b> suggests easy leveling gear (Stealth, Spirit, Insight…).</span></label></li>
+<li><label><input type="checkbox" data-k="c47"> <span>Switch the same character to an <b>Endgame build</b>. <b>Budget target</b> (Starter / Mid / Endgame) comes back and can be changed.</span></label></li>
 <li><label><input type="checkbox" data-k="c8"> <span><b>Gear</b> tab: fill each slot with an item you actually wear. The item list is easy to search and the right items appear for each slot.</span></label></li>
 <li><label><input type="checkbox" data-k="c9"> <span><b>Mercenary</b> tab: pick your merc's type (Act 1, 2, 3 or 5) and its aura or element, set its level, then add its gear. Only weapons that merc can use are listed, and an Act 3 merc gets a shield slot.</span></label></li>
 <li><label><input type="checkbox" data-k="c10"> <span><b>Charms</b> tab: add your charms. The cell count goes up as you add them.</span></label></li>
 <li><label><input type="checkbox" data-k="c11"> <span>Add a second character and switch between them with the picker at the top. Each keeps its own gear.</span></label></li>
 <li><label><input type="checkbox" data-k="c12"> <span>Rename a character by editing its name; the picker at the top updates. Delete one with <b>Delete character</b> in the ⋯ menu.</span></label></li>
 </ul>
-<h2>Shared stash</h2>
-<p>The stash is shared by every character on the account.</p>
+<h2>Stash (one per Mode)</h2>
+<p>Each Mode has its own stash, as in the game: Softcore, Hardcore, SC Ladder, HC Ladder, Offline SC and Offline HC never share items. A character sees only its own Mode's stash.</p>
 <ul class="checks">
 <li><label><input type="checkbox" data-k="c13"> <span>Add a few items you're holding: some gear, a few runes and a gem. The <b>Stash</b> tab count goes up.</span></label></li>
 <li><label><input type="checkbox" data-k="c14"> <span>Add the same rune twice. It stacks into one row with a count instead of two rows.</span></label></li>
@@ -86,6 +89,8 @@
 <li><label><input type="checkbox" data-k="c21"> <span>Add a runeword base: Gear type <b>Base (for runewords)</b>, pick one (e.g. Monarch), set sockets and Ethereal. It lists the runewords that fit, with ✓ where you already have the runes.</span></label></li>
 <li><label><input type="checkbox" data-k="c22"> <span>Use <b>Not in the list? Add a custom item</b> to add something the list doesn't have.</span></label></li>
 <li><label><input type="checkbox" data-k="c23"> <span>Remove an item with ✕.</span></label></li>
+<li><label><input type="checkbox" data-k="c48"> <span>Put two characters in different Modes (for example Softcore and SC Ladder). Add an item with one, then switch to the other. The item isn't there, and the stash heading shows which Mode's stash you're in.</span></label></li>
+<li><label><input type="checkbox" data-k="c49"> <span>On a stash item, use <b>Move to</b> to send it to another Mode's stash. It disappears here and shows up for a character in that Mode.</span></label></li>
 </ul>
 <h2>Photos, planning tabs and upgrades</h2>
 <p><b>Reading stats from a photo.</b> Point your phone at an item tooltip in the game, straight on, with the whole box in frame. The photo is read on your phone and not kept.</p>
@@ -100,7 +105,7 @@
 <li><label><input type="checkbox" data-k="c28"> <span><b>Runewords</b>: with runes in your stash, it lists what you can make and what you're one or two runes away from, and whether a fitting base is in your stash.</span></label></li>
 <li><label><input type="checkbox" data-k="c29"> <span><b>Runewords → Plan a runeword</b>: type a runeword you want (Enigma, HotO…). It shows the runes you hold, the cube steps to make missing ones, and what's left to find.</span></label></li>
 <li><label><input type="checkbox" data-k="c30"> <span><b>Gems &amp; Cube</b>: with gems and runes in your stash, it shows the cube upgrades you can do. Try the <b>Rune upgrade checker</b> with a rune you'd like to make.</span></label></li>
-<li><label><input type="checkbox" data-k="c31"> <span><b>Skills</b>: shows a skill plan for your character's build and level.</span></label></li>
+<li><label><input type="checkbox" data-k="c31"> <span><b>Skills</b>: shows a skill plan for your character's build and level. On a leveling build it shows the order to take skills as you level, with the level each one unlocks.</span></label></li>
 <li><label><input type="checkbox" data-k="c32"> <span><b>Upgrades</b>: stash items that beat your current gear show first, with their 📍 location. Below are suggestions per slot, with Traderie links for items you don't have.</span></label></li>
 <li><label><input type="checkbox" data-k="c33"> <span><b>Upgrades → Stats &amp; resists</b>: set your difficulty and Anya scrolls. Compare the resists with your character screen in the game, and tell me how far off they are.</span></label></li>
 <li><label><input type="checkbox" data-k="c34"> <span><b>Upgrades → breakpoints</b>: FHR (and FCR for casters, attack speed for melee) shows your frames and how much more you need for the next breakpoint.</span></label></li>
