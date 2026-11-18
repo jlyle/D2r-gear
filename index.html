@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="styles.css?v=202611161900">
+  <link rel="stylesheet" href="styles.css?v=202611181015">
 </head>
 <body class="locked">
   <header class="top">
@@ -32,6 +32,32 @@
       </details>
     </div>
   </header>
+
+  <!-- Beta call-out for website visitors. Hidden inside the Android app and once dismissed.
+       Remove when the app is public on Google Play. -->
+  <aside id="betaBanner" class="beta-banner" hidden>
+    <span>📱 <b>Get Perfect Roll on Android</b> — free, no ads. Join the beta: we need 12 testers for 14 days.</span>
+    <span class="beta-actions">
+      <a class="btn small" href="https://groups.google.com/g/perfect-roll-testers" target="_blank" rel="noopener">Join the beta</a>
+      <a class="beta-how" href="testing.html">How it works</a>
+      <button type="button" class="beta-x" id="betaClose" aria-label="Hide this message">✕</button>
+    </span>
+  </aside>
+  <script>
+    (function () {
+      var KEY = "perfectRoll.betaBannerHidden";
+      var b = document.getElementById("betaBanner");
+      var hidden = false;
+      try { hidden = localStorage.getItem(KEY) === "1"; } catch (e) {}
+      var inApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      if (!b || hidden || inApp) return;
+      b.hidden = false;
+      document.getElementById("betaClose").onclick = function () {
+        b.hidden = true;
+        try { localStorage.setItem(KEY, "1"); } catch (e) {}
+      };
+    })();
+  </script>
 
   <main id="app"></main>
 
@@ -57,12 +83,12 @@
     Fan-made tool, not affiliated with Blizzard Entertainment.
   </footer>
 
-  <script src="data.js?v=202611161900"></script>
-  <script src="catalog.js?v=202611161900"></script>
-  <script src="bases.js?v=202611161900"></script>
-  <script src="icons.js?v=202611161900"></script>
-  <script src="statclean.js?v=202611161900"></script>
-  <script src="skills.js?v=202611161900"></script>
-  <script src="app.js?v=202611161900"></script>
+  <script src="data.js?v=202611181015"></script>
+  <script src="catalog.js?v=202611181015"></script>
+  <script src="bases.js?v=202611181015"></script>
+  <script src="icons.js?v=202611181015"></script>
+  <script src="statclean.js?v=202611181015"></script>
+  <script src="skills.js?v=202611181015"></script>
+  <script src="app.js?v=202611181015"></script>
 </body>
 </html>
